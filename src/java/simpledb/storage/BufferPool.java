@@ -9,6 +9,8 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -24,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class BufferPool {
     /** Bytes per page, including header. */
+    //每个page的默认大小为4096Bytes
     private static final int DEFAULT_PAGE_SIZE = 4096;
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
@@ -40,6 +43,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
+        this.bufferPool=new ArrayList<>(numPages);
     }
     
     public static int getPageSize() {
@@ -74,7 +78,24 @@ public class BufferPool {
     public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+        //在bufferPool中查找对应的pid
+        Iterator<Page> iterator=this.bufferPool.iterator();
+        while(iterator.hasNext()){
+            Page temp=iterator.next();
+            if(temp.getId().equals(pid))
+                return temp;
+        }
+        //若未在bufferPool中找到对应的pid
+            //若bufferPool未满
+        if(this.bufferPool.size()<this.DEFAULT_PAGES){
+            //catalog单例中记录了数据库的全部信息，通过pid可以获取表的信息
+            Page temp=Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+            this.bufferPool.add(temp);
+            return temp;
+        }else{
+            //若bufferPool已满，目前先抛出DbException
+            throw new DbException("缓冲区已满，置换失败");
+        }
     }
 
     /**
@@ -208,5 +229,5 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
     }
-
+    private ArrayList<Page> bufferPool=null;
 }

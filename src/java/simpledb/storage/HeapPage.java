@@ -17,6 +17,25 @@ import java.io.*;
  * @see BufferPool
  *
  */
+class ByteTool {
+    public static int[] valAtI={1, 2, 4, 8, 16, 32, 64, -128};
+    public static boolean isTrueAt(byte b, int i) {
+        if((b&valAtI[i])!=0)
+            return true;
+        else
+            return false;
+    }
+
+    public static int getTrueNum(byte b){
+        int result=0;
+        while(b!=0){
+            b=(byte)(b&(b-1));
+            result+=1;
+        }
+        return result;
+    }
+}
+
 public class HeapPage implements Page {
 
     final HeapPageId pid;
@@ -73,19 +92,16 @@ public class HeapPage implements Page {
     */
     private int getNumTuples() {        
         // some code goes here
-        return 0;
-
+        return (int)(8*BufferPool.getPageSize()/(8*Database.getCatalog().getTupleDesc(this.pid.getTableId()).getSize()+1));
     }
 
     /**
      * Computes the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      * @return the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      */
-    private int getHeaderSize() {        
-        
+    private int getHeaderSize() {
         // some code goes here
-        return 0;
-                 
+        return (int)(Math.ceil((double)numSlots/8));
     }
     
     /** Return a view of this page before it was modified
@@ -118,7 +134,7 @@ public class HeapPage implements Page {
      */
     public HeapPageId getId() {
     // some code goes here
-    throw new UnsupportedOperationException("implement this");
+        return this.pid;
     }
 
     /**
@@ -271,7 +287,7 @@ public class HeapPage implements Page {
      */
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here
-	// not necessary for lab1
+	    // not necessary for lab1
     }
 
     /**
@@ -279,16 +295,27 @@ public class HeapPage implements Page {
      */
     public TransactionId isDirty() {
         // some code goes here
-	// Not necessary for lab1
+	    // Not necessary for lab1
         return null;      
     }
 
     /**
      * Returns the number of empty slots on this page.
+     * 返回该page中空槽位的数量
+     * 即：根据header中各比特位的状态确定可用槽位数量
      */
     public int getNumEmptySlots() {
         // some code goes here
-        return 0;
+        int byteNum=numSlots/8;
+        int result=0;
+        for(int i=0;i<byteNum;++i)
+            result+=ByteTool.getTrueNum(header[i]);
+        int rest=numSlots-8*byteNum;
+        for(int i=0;i<rest;++i){
+            if(ByteTool.isTrueAt(header[byteNum], i))
+                result+=1;
+        }
+        return numSlots-result;
     }
 
     /**
@@ -296,7 +323,9 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         // some code goes here
-        return false;
+        int byteIndex=i/8;
+        int offset=i%8;
+        return ByteTool.isTrueAt(header[byteIndex], offset);
     }
 
     /**
@@ -311,10 +340,26 @@ public class HeapPage implements Page {
      * @return an iterator over all tuples on this page (calling remove on this iterator throws an UnsupportedOperationException)
      * (note that this iterator shouldn't return tuples in empty slots!)
      */
+    class MyIterator implements Iterator<Tuple>{
+        private int currentIndex=0;
+        public boolean hasNext(){
+            if(tuples==null||tuples.length==0||currentIndex>=tuples.length)
+                return false;
+            if(tuples[currentIndex]!=null)
+                return true;
+            else
+                return false;
+        }
+
+        public Tuple next(){
+            currentIndex++;
+            return tuples[currentIndex-1];
+        }
+    }
+
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return null;
+        return new MyIterator();
     }
 
 }
-

@@ -1,13 +1,11 @@
 package simpledb.common;
 
-import simpledb.common.Type;
 import simpledb.storage.DbFile;
 import simpledb.storage.HeapFile;
 import simpledb.storage.TupleDesc;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The Catalog keeps track of all available tables in the database and their
@@ -36,7 +34,7 @@ public class Catalog {
         @Override
         public Integer next() {
             index++;
-            return DbFiles.get(this.index).getId();
+            return dbFiles.get(this.index).getId();
         }
     }
     /**
@@ -59,11 +57,11 @@ public class Catalog {
     public void addTable(DbFile file, String name, String pkeyField) {
         // some code goes here
         boolean isAdded=false;
-        for(int i=0;i<this.DbFiles.size();++i) {
+        for(int i = 0; i<this.dbFiles.size(); ++i) {
             int id=file.getId();
-            if (Objects.equals(name, this.names.get(i))||id==this.DbFiles.get(i).getId()) {
+            if (Objects.equals(name, this.names.get(i))||id==this.dbFiles.get(i).getId()) {
                 //更新第i项的数据
-                this.DbFiles.set(i, file);
+                this.dbFiles.set(i, file);
                 this.names.set(i, name);
                 this.primaryKeys.set(i, pkeyField);
                 this.tupleDescs.set(i, file.getTupleDesc());
@@ -75,7 +73,7 @@ public class Catalog {
             this.tupleDescs.add(file.getTupleDesc());
             this.primaryKeys.add(pkeyField);
             this.names.add(name);
-            this.DbFiles.add(file);
+            this.dbFiles.add(file);
         }
     }
 
@@ -100,9 +98,9 @@ public class Catalog {
      */
     public int getTableId(String name) throws NoSuchElementException {
         // some code goes here
-        for(int i=0;i<this.DbFiles.size();++i){
+        for(int i = 0; i<this.dbFiles.size(); ++i){
             if(Objects.equals(name, this.names.get(i)))
-                return this.DbFiles.get(i).getId();
+                return this.dbFiles.get(i).getId();
         }
         throw new NoSuchElementException();
     }
@@ -115,8 +113,8 @@ public class Catalog {
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // some code goes here
-        for(int i=0;i<this.DbFiles.size();++i){
-            if(this.DbFiles.get(i).getId()==tableid)
+        for(int i = 0; i<this.dbFiles.size(); ++i){
+            if(this.dbFiles.get(i).getId()==tableid)
                 return this.tupleDescs.get(i);
         }
         throw new NoSuchElementException();
@@ -129,17 +127,17 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        for(int i=0;i<this.DbFiles.size();++i){
-            if(this.DbFiles.get(i).getId()==tableid)
-                return this.DbFiles.get(i);
+        for(int i = 0; i<this.dbFiles.size(); ++i){
+            if(this.dbFiles.get(i).getId()==tableid)
+                return this.dbFiles.get(i);
         }
         throw new NoSuchElementException();
     }
 
     public String getPrimaryKey(int tableid) {
         // some code goes here
-        for(int i=0;i<this.DbFiles.size();++i){
-            if(this.DbFiles.get(i).getId()==tableid)
+        for(int i = 0; i<this.dbFiles.size(); ++i){
+            if(this.dbFiles.get(i).getId()==tableid)
                 return this.primaryKeys.get(i);
         }
         throw new NoSuchElementException();
@@ -152,8 +150,8 @@ public class Catalog {
 
     public String getTableName(int id) {
         // some code goes here
-        for(int i=0;i<this.DbFiles.size();++i){
-            if(this.DbFiles.get(i).getId()==id)
+        for(int i = 0; i<this.dbFiles.size(); ++i){
+            if(this.dbFiles.get(i).getId()==id)
                 return this.names.get(i);
         }
         throw new NoSuchElementException();
@@ -163,7 +161,7 @@ public class Catalog {
     public void clear() {
         // some code goes here
         this.primaryKeys=new ArrayList<>();
-        this.DbFiles=new ArrayList<>();
+        this.dbFiles =new ArrayList<>();
         this.tupleDescs=new ArrayList<>();
         this.names=new ArrayList<>();
     }
@@ -225,7 +223,7 @@ public class Catalog {
 
     //类域，存储了一组tupleDesc，每个tupleDesc与DbFiles中的一个元素对应
     private ArrayList<TupleDesc> tupleDescs=new ArrayList<>();
-    private ArrayList<DbFile> DbFiles=new ArrayList<>();
+    private ArrayList<DbFile> dbFiles =new ArrayList<>();
     private ArrayList<String> names=new ArrayList<>();
     private ArrayList<String> primaryKeys=new ArrayList<>();
 }

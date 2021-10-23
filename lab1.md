@@ -402,7 +402,7 @@ using `Database.getBufferPool()`).
 
 * src/java/simpledb/common/Catalog.java
 
-*** 
+***
 
 At this point, your code should pass the unit tests in CatalogTest.
 
@@ -450,18 +450,16 @@ include heap files (unsorted files of tuples) and B-trees; for this assignment, 
 access method, and we have written some of the code for you.
 
 <p>
-
 A `HeapFile` object is arranged into a set of pages, each of which consists of a fixed number of bytes for storing
 tuples, (defined by the constant `BufferPool.DEFAULT_PAGE_SIZE`), including a header. In SimpleDB, there is
 one `HeapFile` object for each table in the database. Each page in a `HeapFile` is arranged as a set of slots, each of
 which can hold one tuple (tuples for a given table in SimpleDB are all of the same size). In addition to these slots,
-each page has a header that consists of a bitmap with one bit per tuple slot. If the bit corresponding to a particular
-tuple is 1, it indicates that the tuple is valid; if it is 0, the tuple is invalid (e.g., has been deleted or was never
+each page has a header that consists of a bitmap with one bit per tuple slot. **If the bit corresponding to a particular**
+**tuple is 1, it indicates that the tuple is valid; if it is 0, the tuple is invalid** (e.g., has been deleted or was never
 initialized.)  Pages of `HeapFile` objects are of type `HeapPage` which implements the `Page` interface. Pages are
 stored in the buffer pool but are read and written by the `HeapFile` class.
 
 <p>
-
 SimpleDB stores heap files on disk in more or less the same format they are stored in memory. Each file consists of page
 data arranged consecutively on disk. Each page consists of one or more bytes representing the header, followed by the _
 page size_ bytes of actual page content. Each tuple requires _tuple size_ * 8 bits for its content and 1 bit for the
@@ -495,13 +493,14 @@ The ceiling operation rounds up to the nearest integer number of bytes (we never
 information.)
 
 <p>
-
 The low (least significant) bits of each byte represents the status of the slots that are earlier in the file. Hence,
 the lowest bit of the first byte represents whether or not the first slot in the page is in use. The second lowest bit
 of the first byte represents whether or not the second slot in the page is in use, and so on. Also, note that the
 high-order bits of the last byte may not correspond to a slot that is actually in the file, since the number of slots
 may not be a multiple of 8. Also note that all Java virtual machines
 are [big-endian](http://en.wikipedia.org/wiki/Endianness).
+
+* 大端法：与人类书写习惯一致，高位数字在低字节
 
 <p>
 
@@ -542,7 +541,7 @@ disk.
 
 * src/java/simpledb/storage/HeapFile.java
 
-*** 
+***
 
 To read a page from disk, you will first need to calculate the correct offset in the file. Hint: you will need random
 access to the file in order to read and write pages at arbitrary offsets. You should not call BufferPool methods when

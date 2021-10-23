@@ -11,12 +11,17 @@ import java.io.*;
 import java.util.*;
 
 /**
- * HeapFile is an implementation of a DbFile that stores a collection of tuples
+ *  * HeapFile is an implementation of a DbFile that stores a collection of tuples
  * in no particular order. Tuples are stored on pages, each of which is a fixed
  * size, and the file is simply a collection of those pages. HeapFile works
  * closely with HeapPage. The format of HeapPages is described in the HeapPage
  * constructor.
- * 
+ *
+ * HeapFile是DbFile的一个实现，它不按特定顺序存储图元的集合。
+ * 图元被存储在页面上，每个页面的大小是固定的，而文件只是这些页面
+ * 的集合。HeapFile与HeapPage紧密合作。HeapPages的格式在
+ * HeapPage构造函数中描述。
+ *
  * @see HeapPage#HeapPage
  * @author Sam Madden
  */
