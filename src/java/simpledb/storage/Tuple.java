@@ -44,12 +44,12 @@ public class Tuple implements Serializable {
     /**
      * @return The RecordId representing the location of this tuple on disk. May
      *         be null.
-     *         暂时做不了
+     *
      *
      */
     public RecordId getRecordId() {
         // some code goes here
-        return null;
+        return this.recordId;
     }
 
     /**
@@ -60,6 +60,7 @@ public class Tuple implements Serializable {
      */
     public void setRecordId(RecordId rid) {
         // some code goes here
+        this.recordId=rid;
     }
 
     /**
@@ -131,4 +132,5 @@ public class Tuple implements Serializable {
 
     private TupleDesc tupleDesc=null;
     private ArrayList<Field> fields;
+    private RecordId recordId;
 }

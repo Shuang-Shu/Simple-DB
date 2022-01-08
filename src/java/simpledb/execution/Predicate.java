@@ -4,15 +4,19 @@ import simpledb.storage.Field;
 import simpledb.storage.Tuple;
 
 import java.io.Serializable;
+import java.nio.channels.FileLockInterruptionException;
 
 /**
  * Predicate compares tuples to a specified Field value.
+ * 谓词将图元与一个指定的字段值进行比较。
+ * Predicate对象用于filter运算符
  */
 public class Predicate implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /** Constants used for return codes in Field.compare */
+    //一个名为Op的枚举类
     public enum Op implements Serializable {
         EQUALS, GREATER_THAN, LESS_THAN, LESS_THAN_OR_EQ, GREATER_THAN_OR_EQ, LIKE, NOT_EQUALS;
 
@@ -46,19 +50,29 @@ public class Predicate implements Serializable {
         }
 
     }
-    
+
+    private int field;
+    private Op op;
+    private Field operand;
+
     /**
      * Constructor.
      * 
      * @param field
      *            field number of passed in tuples to compare against.
+     *            传入进行比较的tuple的field标号
      * @param op
      *            operation to use for comparison
-     * @param operand
+     *            用于比较的操作符
+     * @param operand (操作数，运算对象)
      *            field value to compare passed in tuples to
+     *            要将传入的图元与之比较的字段值
      */
     public Predicate(int field, Op op, Field operand) {
         // some code goes here
+        this.field=field;
+        this.op=op;
+        this.operand=operand;
     }
 
     /**
@@ -67,7 +81,7 @@ public class Predicate implements Serializable {
     public int getField()
     {
         // some code goes here
-        return -1;
+        return this.field;
     }
 
     /**
@@ -76,7 +90,7 @@ public class Predicate implements Serializable {
     public Op getOp()
     {
         // some code goes here
-        return null;
+        return this.op;
     }
     
     /**
@@ -85,7 +99,7 @@ public class Predicate implements Serializable {
     public Field getOperand()
     {
         // some code goes here
-        return null;
+        return this.operand;
     }
     
     /**
@@ -100,7 +114,7 @@ public class Predicate implements Serializable {
      */
     public boolean filter(Tuple t) {
         // some code goes here
-        return false;
+        return (t.getField(this.field).compare(this.op, this.operand));
     }
 
     /**
@@ -109,6 +123,6 @@ public class Predicate implements Serializable {
      */
     public String toString() {
         // some code goes here
-        return "";
+        return "field="+this.field+" op="+this.op.toString()+" operand="+this.operand.toString();
     }
 }

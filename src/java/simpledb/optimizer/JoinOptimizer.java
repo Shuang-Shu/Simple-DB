@@ -1,5 +1,6 @@
 package simpledb.optimizer;
 
+import net.sf.antcontrib.design.Log;
 import simpledb.common.Database;
 import simpledb.ParsingException;
 import simpledb.execution.*;
@@ -18,6 +19,7 @@ import javax.swing.tree.*;
 public class JoinOptimizer {
     final LogicalPlan p;
     final List<LogicalJoinNode> joins;
+    private PlanCache planCache;
 
     /**
      * Constructor
@@ -30,6 +32,7 @@ public class JoinOptimizer {
     public JoinOptimizer(LogicalPlan p, List<LogicalJoinNode> joins) {
         this.p = p;
         this.joins = joins;
+        this.planCache=new PlanCache();
     }
 
     /**
@@ -130,7 +133,7 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return -1.0;
+            return cost1+card1*cost2+card1*card2;
         }
     }
 
@@ -176,6 +179,29 @@ public class JoinOptimizer {
                                                    Map<String, Integer> tableAliasToId) {
         int card = 1;
         // some code goes here
+        // 若左侧为主键
+        if(t1pkey){
+            return card2;
+        }
+        // 若右侧为主键
+        if(t2pkey){
+            return card1;
+        }
+        // 若均非主键（目前暂不需要实现，可日后升级）
+        /*
+        // ntups1,ntups2分别为表1，2的元组数
+        int ntups1=stats.get(table1Alias).totalTuples();
+        int ntups2=stats.get(table2Alias).totalTuples();
+        */
+
+        // cardOnLeft：以左侧table为主的基数
+        int cardOnLeft=0;
+
+        // cardOnRight：以右侧table为主的基数
+        int cardOnRight=0;
+
+
+        card=Math.min(cardOnLeft, cardOnRight);
         return card <= 0 ? 1 : card;
     }
 
@@ -208,7 +234,6 @@ public class JoinOptimizer {
         }
 
         return els;
-
     }
 
     /**
@@ -235,10 +260,52 @@ public class JoinOptimizer {
             Map<String, TableStats> stats,
             Map<String, Double> filterSelectivities, boolean explain)
             throws ParsingException {
-
         // some code goes here
+        // 将动态规划中长度为1的连接直接加入PlanCache
+        Set<Set<LogicalJoinNode>> sigleJoinSet=enumerateSubsets(joins, 1);
+        for(Set<LogicalJoinNode> set:sigleJoinSet){
+            Iterator<LogicalJoinNode> iterator=set.iterator();
+            LogicalJoinNode tempNode=iterator.next();
+            // 这是所有的单个JoinNode
+            int card1,card2;
+            double cost1, cost2;
+            boolean leftPkey,rightPkey;
+
+            leftPkey=isPkey(tempNode.t1Alias, tempNode.f1PureName);
+            rightPkey=isPkey(tempNode.t2Alias, tempNode.f2PureName);
+            String tableName1=Database.getCatalog().getTableName(p.getTableId(tempNode.t1Alias));
+            String tableName2=Database.getCatalog().getTableName(p.getTableId(tempNode.t2Alias));
+            card1=stats.get(tableName1).estimateTableCardinality(filterSelectivities.get(tempNode.t1Alias));
+            card2=stats.get(tableName2).estimateTableCardinality(filterSelectivities.get(tempNode.t2Alias));
+
+            cost1=stats.get(tableName1).estimateScanCost();
+            cost2=stats.get(tableName2).estimateScanCost();
+
+            int card=estimateJoinCardinality(tempNode, card1, card2, leftPkey, rightPkey, stats);
+            double cost=estimateJoinCost(tempNode, card1, card2, cost1, cost2);
+            List<LogicalJoinNode> list=new ArrayList<>();
+            list.add(tempNode);
+            planCache.addPlan(set, cost, card, list);
+        }
+
+        for(int i=2;i<=joins.size();++i){
+            // 获取长度为i的joinOrder子集合
+            Set<Set<LogicalJoinNode>> subJoinPlanSet=enumerateSubsets(joins, i);
+            for(Set<LogicalJoinNode> set:subJoinPlanSet){
+                // 遍历每一个子查询集合
+                CostCard bestSubPlan=new CostCard();
+                bestSubPlan.cost=Double.MAX_VALUE;
+                for(LogicalJoinNode logicalJoinNode:set){
+                    CostCard temp=computeCostAndCardOfSubplan(stats, filterSelectivities, logicalJoinNode, set, bestSubPlan.cost, planCache);
+                    if(temp!=null)
+                        bestSubPlan=temp;
+                }
+                planCache.addPlan(set, bestSubPlan.cost, bestSubPlan.card, bestSubPlan.plan);
+            }
+        }
         //Replace the following
-        return joins;
+        Set<Set<LogicalJoinNode>> tempSet=enumerateSubsets(joins, joins.size());
+        return planCache.getOrder(tempSet.iterator().next());
     }
 
     // ===================== Private Methods =================================
@@ -279,7 +346,6 @@ public class JoinOptimizer {
             Map<String, Double> filterSelectivities,
             LogicalJoinNode joinToRemove, Set<LogicalJoinNode> joinSet,
             double bestCostSoFar, PlanCache pc) throws ParsingException {
-
         LogicalJoinNode j = joinToRemove;
 
         List<LogicalJoinNode> prevBest;

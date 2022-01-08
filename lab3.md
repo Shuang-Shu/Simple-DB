@@ -4,10 +4,7 @@
 **Due: Tuesday, Apr 6, 2021**
 
 In this lab, you will implement a query optimizer on top of SimpleDB.
-The main tasks include implementing a selectivity estimation framework
-and a cost-based optimizer. You have freedom as to exactly what you
-implement, but we recommend using something similar to the Selinger
-cost-based optimizer discussed in class (Lecture 9).
+The main tasks include implementing a selectivity estimation framework and a cost-based optimizer. You have freedom as to exactly what you implement, but we recommend using something similar to the Selinger cost-based optimizer discussed in class (Lecture 9).
 
 The remainder of this document describes what is involved in
 adding optimizer support and provides a basic outline of how
@@ -60,9 +57,7 @@ steps are given in Section 2 below.
 Recall that the main idea of a cost-based optimizer is to:
 
 *  Use statistics about tables to estimate "costs" of different
-   query plans.  Typically, the cost of a plan is related to the  cardinalities of
-   (number of tuples produced by) intermediate joins and selections, as well as the
-   selectivity of filter and join predicates.
+   query plans.  Typically, the cost of a plan is related to the  cardinalities of (number of tuples produced by) intermediate joins and selections, as well as the selectivity of filter and join predicates.
 *  Use these statistics to order joins and selections in an
    optimal way, and to select the best implementation for join
    algorithms from amongst several alternatives.
@@ -109,6 +104,7 @@ the basic operation is as follows:
     <tt>LogicalPlan</tt> instance it has constructed.  The <tt>physicalPlan</tt> method returns a
     <tt>DBIterator</tt> object that can be used to actually run the query.
     
+
 In the exercises to come, you will implement the methods that help
 <tt>physicalPlan</tt> devise an optimal plan.
 
@@ -175,16 +171,11 @@ this is the *filter selectivity estimation* problem.  Here's one
 approach that you might use, based on computing a histogram over the
 values in the table:
 
-*  Compute the minimum and maximum values for every attribute in the table (by scanning
-   it once).
+*  Compute the minimum and maximum values for every attribute in the table (by scanning it once).
 *  Construct a histogram for every attribute in the table. A simple
-   approach is to use a fixed number of buckets *NumB*,
-   with
-   each bucket representing the number of records in a fixed range of the
+   approach is to use a fixed number of buckets *NumB*, with each bucket representing the number of records in a fixed range of the
    domain of the attribute of the histogram.  For example, if a field
-   *f* ranges from 1 to 100, and there are 10 buckets, then bucket 1 might
-   contain the count of the number of records between 1 and 10, bucket
-   2 a count of the number of records between 11 and 20, and so on.
+   *f* ranges from 1 to 100, and there are 10 buckets, then bucket 1 might contain the count of the number of records between 1 and 10, bucket 2 a count of the number of records between 11 and 20, and so on.
 *  Scan the table again, selecting out all of fields of all of the
    tuples and using them to populate the counts of the buckets
    in each histogram.
@@ -198,20 +189,7 @@ values in the table:
    expression is roughly *(h / w) / ntups*, since *(h/w)*
    represents the expected number of tuples in the bin with value
    *const*.
-*  To estimate the selectivity of a range expression *f>const*,
-   compute the
-   bucket *b* that *const* is in, with width *w_b* and height
-   *h_b*.  Then, *b* contains a fraction <nobr>*b_f = h_b / ntups* </nobr>of the
-   total tuples.  Assuming tuples are uniformly distributed throughout *b*,
-   the fraction *b_part* of *b* that is *> const* is
-   <nobr>*(b_right - const) / w_b*</nobr>, where *b_right* is the right endpoint of
-   *b*'s bucket.  Thus, bucket *b* contributes *(b_f  x
-   b_part)* selectivity to the predicate.  In addition, buckets
-   *b+1...NumB-1* contribute all of their
-   selectivity (which can be computed using a formula similar to
-   *b_f* above).  Summing the selectivity contributions of all the
-   buckets will yield the overall selectivity of the expression.
-   Figure 2 illustrates this process.
+*  To estimate the selectivity of a range expression *f>const*,compute the bucket *b* that *const* is in, with width *w_b* and height *h_b*.  Then, *b* contains a fraction <nobr>*b_f = h_b / ntups* </nobr>of the total tuples.  Assuming tuples are uniformly distributed throughout *b*, the fraction *b_part* of *b* that is *> const* is <nobr>*(b_right - const) / w_b*</nobr>, where *b_right* is the right endpoint of *b*'s bucket.  Thus, bucket *b* contributes *(b_f  x b_part)* selectivity to the predicate.  In addition, buckets *b+1...NumB-1* contribute all of their selectivity (which can be computed using a formula similar to *b_f* above).  Summing the selectivity contributions of all the buckets will yield the overall selectivity of the expression. Figure 2 illustrates this process.
 *  Selectivity of expressions involving *less than* can be performed
    similar to the greater than case, looking at buckets down to 0.
 
@@ -242,41 +220,23 @@ implement a better estimator, though you should not need to in order to
 complete this lab.
 
 After completing this exercise, you should be able to pass the
-<tt>IntHistogramTest</tt> unit test (you are not required to pass this test if you
-choose not to implement histogram-based selectivity estimation).
+<tt>IntHistogramTest</tt> unit test (you are not required to pass this test if you choose not to implement histogram-based selectivity estimation).
 
 ***
 **Exercise 2:  TableStats.java**
 
-The class <tt>TableStats</tt> contains methods that compute
-the number of tuples and pages in a table and that estimate the
-selectivity of predicates over the fields of that table.  The
-query parser we have created creates one instance of <tt>TableStats</tt> per
-table,  and passes these structures into your query optimizer (which
-you will need in later exercises).
+The class <tt>TableStats</tt> contains methods that compute the number of tuples and pages in a table and that estimate the selectivity of predicates over the fields of that table.  The query parser we have created creates one instance of <tt>TableStats</tt> per table,  and passes these structures into your query optimizer (which you will need in later exercises).
 
 You should fill in the following methods and classes in <tt>TableStats</tt>:
 
 *  Implement the <tt>TableStats</tt>  constructor:
-   Once you have
-   implemented a method for tracking statistics such as histograms, you
-   should implement the <tt>TableStats</tt> constructor, adding code
-   to scan the table (possibly multiple times) to build the statistics
-   you need.
+   Once you have implemented a method for tracking statistics such as histograms, you should implement the <tt>TableStats</tt> constructor, adding code to scan the table (possibly multiple times) to build the statistics you need.
 *   Implement <tt>estimateSelectivity(int field, Predicate.Op op,
-    Field constant)</tt>: Using your statistics (e.g., an <tt>IntHistogram</tt>
-    or <tt>StringHistogram</tt> depending on the type of the field), estimate
+    Field constant)</tt>: Using your statistics (e.g., an <tt>IntHistogram</tt> or <tt>StringHistogram</tt> depending on the type of the field), estimate
     the selectivity of predicate <tt>field op constant</tt> on the table.
-*   Implement <tt>estimateScanCost()</tt>: This method estimates the
-    cost of sequentially scanning the file, given that the cost to read
-    a page is <tt>costPerPageIO</tt>.  You can assume that there are no
-    seeks and that no pages are in the buffer pool.  This method may
-    use costs or sizes you computed in the constructor.
+*  Implement <tt>estimateScanCost()</tt>: This method estimates the cost of sequentially scanning the file, given that the cost to read a page is <tt>costPerPageIO</tt>.  You can assume that there are no seeks and that no pages are in the buffer pool.  This method may use costs or sizes you computed in the constructor.
 *   Implement <tt>estimateTableCardinality(double
-    selectivityFactor)</tt>: This method returns the number of tuples
-    in the relation, given that a predicate with selectivity
-    selectivityFactor is applied. This method may
-    use costs or sizes you computed in the constructor.
+    selectivityFactor)</tt>: This method returns the number of tuples in the relation, given that a predicate with selectivity selectivityFactor is applied. This method may use costs or sizes you computed in the constructor.
 
 You may wish to modify the constructor of <tt>TableStats.java</tt> to, for
 example, compute histograms over the fields as described above for
@@ -302,7 +262,7 @@ While implementing your simple solution, you  should keep in mind the following:
 
 <!--  
   * <a name="change">The following three paragraphs are different in this version of the lab. </a> *
-  .-->
+    .-->
 *  For equality joins, when one of the attributes is a primary key, the number of tuples produced by the join cannot
    be larger than the cardinality of the non-primary key attribute.
 * For equality joins when there is no primary key, it's hard to say much about what the size of the output
@@ -311,9 +271,7 @@ While implementing your simple solution, you  should keep in mind the following:
   the size of the larger of the two tables).
 *  For range scans, it is similarly hard to say anything accurate about sizes.
    The size of the output should be proportional to
-   the sizes of the inputs.  It is fine to assume that a fixed fraction
-   of the cross-product is emitted by range scans (say, 30%).  In general, the cost of a range
-   join should be larger than the cost of a non-primary key equality join of two tables
+   the sizes of the inputs.  It is fine to assume that a fixed fraction of the cross-product is emitted by range scans (say, 30%).  In general, the cost of a range join should be larger than the cost of a non-primary key equality join of two tables
    of the same size.
 
 
@@ -321,7 +279,6 @@ While implementing your simple solution, you  should keep in mind the following:
 
 ***
 **Exercise 3:  Join Cost Estimation**
-
 
 The class <tt>JoinOptimizer.java</tt> includes all of the methods
 for ordering and computing costs of joins.  In this exercise, you
@@ -334,7 +291,7 @@ a join, specifically:
    join j, given that the left input is of cardinality card1, the
    right input of cardinality card2, that the cost to scan the left
    input is cost1, and that the cost to access the right input is
-   card2.  You can assume the join is an NL join, and apply
+   card2.  You can assume the join is an Nested-Loop join, and apply
    the formula mentioned earlier.
 *  Implement <tt>estimateJoinCardinality(LogicalJoinNode j, int
    card1, int card2, boolean t1pkey, boolean t2pkey)</tt>: This
@@ -373,8 +330,7 @@ Translating the algorithm given in lecture to the join node list form mentioned 
 To help you implement this algorithm, we have provided several classes and methods to assist you.  First,
 the method <tt>enumerateSubsets(List<T> v, int size)</tt> in <tt>JoinOptimizer.java</tt> will return
 a set of all of the subsets of <tt>v</tt> of size <tt>size</tt>. This method is VERY inefficient for large
-sets; you can earn extra credit by implementing a more efficient enumerator (hint: consider using an in-place
-generation algorithm and a lazy iterator (or stream) interface to avoid materializing the entire power set).
+sets; you can earn extra credit by implementing a more efficient enumerator (hint: consider using an in-place generation algorithm and a lazy iterator (or stream) interface to avoid materializing the entire power set).
 
 Second, we have provided the method:
 ```java
@@ -394,7 +350,9 @@ the cost, cardinality, and best join ordering (as a list).
 <tt>computeCostAndCardOfSubplan</tt> may return null, if no plan can
 be found (because, for example, there is no left-deep join that is
 possible), or if the cost of all plans is greater than the
-<tt>bestCostSoFar</tt> argument.  The method uses a cache of previous
+<tt>bestCostSoFar</tt> argument. 
+
+ The method uses a cache of previous
 joins called <tt>pc</tt> (<tt>optjoin</tt> in the psuedocode above) to
 quickly lookup the fastest way to join <tt>joinSet -
 {joinToRemove}</tt>.    The other arguments (<tt>stats</tt> and
@@ -442,7 +400,6 @@ allows you to find the selectivity of any predicates over a table;
 it is guaranteed to have one entry per table name in the
 <tt>FROM</tt> list.  Finally, <tt>explain</tt> specifies that you
 should output a representation of the join order for informational purposes.
-
 
 You may wish to use the helper methods and classes described above to assist
 in your implementation. Roughly, your implementation should follow

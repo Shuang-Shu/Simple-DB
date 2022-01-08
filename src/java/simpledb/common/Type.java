@@ -61,6 +61,8 @@ public enum Type implements Serializable {
    * @param dis The input stream to read from
    * @throws ParseException if the data read from the input stream is not
    *   of the appropriate type.
+   *   从dis对象中解析出一个Field对象
+   *
    */
     public abstract Field parse(DataInputStream dis) throws ParseException;
 

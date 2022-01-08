@@ -42,7 +42,9 @@ public abstract class Operator implements OpIterator {
      * Returns the next Tuple in the iterator, or null if the iteration is
      * finished. Operator uses this method to implement both <code>next</code>
      * and <code>hasNext</code>.
-     * 
+     *
+     * 可视为hasNext()和next()的聚合方法
+     *
      * @return the next Tuple in the iterator, or null if the iteration is
      *         finished.
      */

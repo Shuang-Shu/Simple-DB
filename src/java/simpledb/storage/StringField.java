@@ -59,12 +59,14 @@ public class StringField implements Field {
 	 */
 	public void serialize(DataOutputStream dos) throws IOException {
 		String s = value;
+		//overflow是maxSize与s.length的差值
 		int overflow = maxSize - s.length();
 		if (overflow < 0) {
             s = s.substring(0, maxSize);
 		}
 		dos.writeInt(s.length());
 		dos.writeBytes(s);
+		//将之后的字节置0
 		while (overflow-- > 0)
 			dos.write((byte) 0);
 	}

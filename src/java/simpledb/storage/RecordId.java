@@ -6,6 +6,7 @@ import java.util.Objects;
 /**
  * A RecordId is a reference to a specific tuple on a specific page of a
  * specific table.
+ * 每个RecordId唯一地标识了一个tuple
  */
 public class RecordId implements Serializable {
 
@@ -74,6 +75,7 @@ public class RecordId implements Serializable {
         // some code goes here
         return Objects.hash(this.pageId, this.tupleNo);
     }
+
     private PageId pageId;
     private int tupleNo;
 }

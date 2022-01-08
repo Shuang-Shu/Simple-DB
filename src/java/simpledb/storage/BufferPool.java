@@ -8,9 +8,11 @@ import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
 import java.io.*;
+import java.util.*;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -82,19 +84,24 @@ public class BufferPool {
         Iterator<Page> iterator=this.bufferPool.iterator();
         while(iterator.hasNext()){
             Page temp=iterator.next();
-            if(temp.getId().equals(pid))
+            if(temp!=null&&temp.getId().equals(pid))
                 return temp;
         }
         //若未在bufferPool中找到对应的pid
             //若bufferPool未满
         if(this.bufferPool.size()<this.DEFAULT_PAGES){
             //catalog单例中记录了数据库的全部信息，通过pid可以获取表的信息
-            Page temp=Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
-            this.bufferPool.add(temp);
-            return temp;
+            try {
+                Page temp = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+                this.bufferPool.add(temp);
+                return temp;
+            }catch (NoSuchElementException e){
+                return null;
+            }
         }else{
             //若bufferPool已满，目前先抛出DbException
-            throw new DbException("缓冲区已满，置换失败");
+            this.evictPage();
+            return this.getPage(tid, pid, perm);
         }
     }
 
@@ -146,7 +153,7 @@ public class BufferPool {
      * acquire a write lock on the page the tuple is added to and any other 
      * pages that are updated (Lock acquisition is not needed for lab2). 
      * May block if the lock(s) cannot be acquired.
-     * 
+     *
      * Marks any pages that were dirtied by the operation as dirty by calling
      * their markDirty bit, and adds versions of any pages that have 
      * been dirtied to the cache (replacing any existing versions of those pages) so 
@@ -160,6 +167,12 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        DbFile dbFile=Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> list=new ArrayList<>();
+        list=dbFile.insertTuple(tid, t);
+        for(Page page:list) {
+            page.markDirty(true, tid);
+        }
     }
 
     /**
@@ -179,6 +192,17 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        try {
+            DbFile dbFile = Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
+            List<Page> list;
+            list=dbFile.deleteTuple(tid, t);
+            for(Page page:list) {
+                page.markDirty(true, tid);
+            }
+        }catch (NoSuchElementException e){
+            //若未找到，则不进行删除
+            return;
+        }
     }
 
     /**
@@ -189,7 +213,10 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for(int i=0;i<this.bufferPool.size();++i){
+            if(this.bufferPool.get(i)!=null&&this.bufferPool.get(i).isDirty()!=null)
+                this.flushPage(this.bufferPool.get(i).getId());
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -203,6 +230,19 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        int idx=-1;
+        for(int i=0;i<this.bufferPool.size();++i){
+            if(this.bufferPool.get(i).getId().equals(pid)) {
+                idx = i;
+                break;
+            }
+        }
+        if(idx==-1)
+            return;
+        else{
+            this.bufferPool.set(idx, this.bufferPool.get(this.bufferPool.size()-1));
+            this.bufferPool.remove(this.bufferPool.size()-1);
+        }
     }
 
     /**
@@ -212,6 +252,15 @@ public class BufferPool {
     private synchronized  void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        Iterator<Page> iterator=this.bufferPool.iterator();
+        while (iterator.hasNext()){
+            Page temp=iterator.next();
+            if(temp.getId().equals(pid)){
+                Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(temp);
+                return;
+            }
+        }
+        return;
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -228,6 +277,13 @@ public class BufferPool {
     private synchronized  void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        //仅仅简单的替换掉第一个page
+        try {
+            this.flushPage(this.bufferPool.get(0).getId());
+            this.discardPage(this.bufferPool.get(0).getId());
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
     private ArrayList<Page> bufferPool=null;
 }

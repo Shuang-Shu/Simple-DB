@@ -37,6 +37,14 @@ public class Catalog {
             return dbFiles.get(this.index).getId();
         }
     }
+
+    //类域，存储了一组tupleDesc，每个tupleDesc与DbFiles中的一个元素对应
+    private ArrayList<TupleDesc> tupleDescs=new ArrayList<>();
+    private ArrayList<DbFile> dbFiles =new ArrayList<>();
+    private ArrayList<String> names=new ArrayList<>();
+    private ArrayList<String> primaryKeys=new ArrayList<>();
+    private ArrayList<Integer> tableIds=new ArrayList<>();
+
     /**
      * Constructor.
      * Creates a new, empty catalog.
@@ -65,6 +73,7 @@ public class Catalog {
                 this.names.set(i, name);
                 this.primaryKeys.set(i, pkeyField);
                 this.tupleDescs.set(i, file.getTupleDesc());
+                this.tableIds.set(i, file.getId());
                 isAdded=true;
             }
         }
@@ -74,6 +83,7 @@ public class Catalog {
             this.primaryKeys.add(pkeyField);
             this.names.add(name);
             this.dbFiles.add(file);
+            this.tableIds.add(file.getId());
         }
     }
 
@@ -114,7 +124,7 @@ public class Catalog {
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // some code goes here
         for(int i = 0; i<this.dbFiles.size(); ++i){
-            if(this.dbFiles.get(i).getId()==tableid)
+            if(this.tableIds.get(i)==tableid)
                 return this.tupleDescs.get(i);
         }
         throw new NoSuchElementException();
@@ -128,7 +138,7 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         for(int i = 0; i<this.dbFiles.size(); ++i){
-            if(this.dbFiles.get(i).getId()==tableid)
+            if(this.tableIds.get(i)==tableid)
                 return this.dbFiles.get(i);
         }
         throw new NoSuchElementException();
@@ -165,7 +175,14 @@ public class Catalog {
         this.tupleDescs=new ArrayList<>();
         this.names=new ArrayList<>();
     }
-    
+
+    public void resetTableId(int oldId, int newId){
+        for(int i=0;i<this.tableIds.size();++i){
+            if(this.tableIds.get(i)==oldId)
+                this.tableIds.set(i, newId);
+        }
+    }
+
     /**
      * Reads the schema from a file and creates the appropriate tables in the database.
      * @param catalogFile
@@ -220,11 +237,5 @@ public class Catalog {
             System.exit(0);
         }
     }
-
-    //类域，存储了一组tupleDesc，每个tupleDesc与DbFiles中的一个元素对应
-    private ArrayList<TupleDesc> tupleDescs=new ArrayList<>();
-    private ArrayList<DbFile> dbFiles =new ArrayList<>();
-    private ArrayList<String> names=new ArrayList<>();
-    private ArrayList<String> primaryKeys=new ArrayList<>();
 }
 

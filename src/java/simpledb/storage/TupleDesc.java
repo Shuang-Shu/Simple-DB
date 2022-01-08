@@ -35,7 +35,12 @@ public class TupleDesc implements Serializable {
             this.fieldName = n;
             this.fieldType = t;
         }
-
+        public String getFieldName(){
+            return this.fieldName;
+        }
+        public Type getFieldType(){
+            return this.fieldType;
+        }
         public String toString() {
             return fieldName + "(" + fieldType + ")";
         }

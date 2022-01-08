@@ -18,7 +18,7 @@ import java.io.*;
  *
  */
 class ByteTool {
-    public static int[] valAtI={1, 2, 4, 8, 16, 32, 64, -128};
+    public static byte[] valAtI={1, 2, 4, 8, 16, 32, 64, -128};
     public static boolean isTrueAt(byte b, int i) {
         if((b&valAtI[i])!=0)
             return true;
@@ -34,6 +34,16 @@ class ByteTool {
         }
         return result;
     }
+
+    public static byte setClear(byte b, int i) {
+        b=(byte)(b&(~(valAtI[i])));
+        return b;
+    }
+
+    public static byte setTrue(byte b, int i) {
+        b=(byte)(b|(valAtI[i]));
+        return b;
+    }
 }
 
 public class HeapPage implements Page {
@@ -43,6 +53,9 @@ public class HeapPage implements Page {
     final byte[] header;
     final Tuple[] tuples;
     final int numSlots;
+
+    private boolean dirty;
+    TransactionId tid;
 
     byte[] oldData;
     private final Byte oldDataLock= (byte) 0;
@@ -67,6 +80,9 @@ public class HeapPage implements Page {
         this.pid = id;
         this.td = Database.getCatalog().getTupleDesc(id.getTableId());
         this.numSlots = getNumTuples();
+        this.dirty=false;
+        this.tid=null;
+
         DataInputStream dis = new DataInputStream(new ByteArrayInputStream(data));
 
         // allocate and read the header slots of this page
@@ -266,7 +282,18 @@ public class HeapPage implements Page {
      */
     public void deleteTuple(Tuple t) throws DbException {
         // some code goes here
-        // not necessary for lab1
+        // not necessary for lab
+        // 注意，tuple本身的recodrId已经标识了它的位置
+        int i=t.getRecordId().getTupleNumber();
+        if(this.isSlotUsed(i)) {
+            this.tuples[i]=null;
+            int base = i / 8;
+            byte b = this.header[base];
+            int offset = i % 8;
+            this.header[base] = ByteTool.setClear(b, offset);
+            return;
+        }
+        throw new DbException("未在page中找到tuple");
     }
 
     /**
@@ -279,6 +306,21 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+        //注意，要记得更新元组的相关信息
+        //首先在tuples中寻找空位
+        for(int i=0;i<this.tuples.length;++i){
+            if(this.tuples[i]==null){
+                RecordId recordId=new RecordId(pid, i);
+                t.setRecordId(recordId);
+                int base=i/8;
+                byte b=this.header[base];
+                int offset=i%8;
+                this.header[base]=ByteTool.setTrue(b, offset);
+                this.tuples[i]=t;
+                return;
+            }
+        }
+        throw new DbException("Page已满");
     }
 
     /**
@@ -288,6 +330,8 @@ public class HeapPage implements Page {
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here
 	    // not necessary for lab1
+        this.dirty=dirty;
+        this.tid=tid;
     }
 
     /**
@@ -296,7 +340,10 @@ public class HeapPage implements Page {
     public TransactionId isDirty() {
         // some code goes here
 	    // Not necessary for lab1
-        return null;      
+        if(this.dirty==true)
+            return this.tid;
+        else
+            return null;
     }
 
     /**
@@ -334,6 +381,7 @@ public class HeapPage implements Page {
     private void markSlotUsed(int i, boolean value) {
         // some code goes here
         // not necessary for lab1
+        // 不必要，已经被集成
     }
 
     /**

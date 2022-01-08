@@ -8,6 +8,7 @@ import java.io.Serializable;
 /**
  * JoinPredicate compares fields of two tuples using a predicate. JoinPredicate
  * is most likely used by the Join operator.
+ * JoinPredicate谓词用于Join运算符
  */
 public class JoinPredicate implements Serializable {
 
@@ -27,8 +28,14 @@ public class JoinPredicate implements Serializable {
      *            Predicate.Op.LESS_THAN_OR_EQ
      * @see Predicate
      */
+    private int field1;
+    private int filed2;
+    private Predicate.Op op;
     public JoinPredicate(int field1, Predicate.Op op, int field2) {
         // some code goes here
+        this.field1=field1;
+        this.filed2=field2;
+        this.op=op;
     }
 
     /**
@@ -39,24 +46,26 @@ public class JoinPredicate implements Serializable {
      */
     public boolean filter(Tuple t1, Tuple t2) {
         // some code goes here
-        return false;
+        //
+        Predicate predicate=new Predicate(this.filed2, this.op, t2.getField(this.filed2));
+        return predicate.filter(t1);
     }
     
     public int getField1()
     {
         // some code goes here
-        return -1;
+        return this.field1;
     }
     
     public int getField2()
     {
         // some code goes here
-        return -1;
+        return this.filed2;
     }
     
     public Predicate.Op getOperator()
     {
         // some code goes here
-        return null;
+        return this.op;
     }
 }

@@ -80,7 +80,7 @@ public interface Aggregator extends Serializable {
     void mergeTupleIntoGroup(Tuple tup);
 
     /**
-     * Create a OpIterator over group aggregate results.
+     * Create a OpIterator over group <b>aggregate results</b>.
      * @see TupleIterator for a possible helper
      */
     OpIterator iterator();

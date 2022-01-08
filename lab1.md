@@ -4,7 +4,6 @@
 
 **Due: Wed, Mar 10 11:59 PM EDT**
 
-
 <!--
 **Bug Update:** We have a [page](bugs.html) to keep track
 of SimpleDB bugs that you or we find. Fixes for bugs/annoyances will also be
@@ -560,13 +559,11 @@ Operators are responsible for the actual execution of the query plan. They imple
 algebra. In SimpleDB, operators are iterator based; each operator implements the `DbIterator` interface.
 
 <p>
-
 Operators are connected together into a plan by passing lower-level operators into the constructors of higher-level
 operators, i.e., by 'chaining them together.' Special access method operators at the leaves of the plan are responsible
 for reading data from the disk (and hence do not have any operators below them).
 
 <p>
-
 At the top of the plan, the program interacting with SimpleDB simply calls `getNext` on the root operator; this operator
 then calls `getNext` on its children, and so on, until these leaf operators are called. They fetch tuples from disk and
 pass them up the tree (as return arguments to `getNext`); tuples propagate up the plan in this way until they are output

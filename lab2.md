@@ -7,7 +7,6 @@
 <!--
 Version History:
 
-
 3/1/12 : Initial version
 -->
 
@@ -49,6 +48,7 @@ $ git pull upstream master
 
 **IDE users** will have update their project dependency to include the new library jars.
 For an easy solution, run
+
 ```
 ant eclipse
 ```
@@ -69,8 +69,7 @@ the jars as compile-time dependencies.
 
 ### 1.2. Implementation hints
 
-As before, we **strongly encourage** you to read through this entire document to get a feel for the high-level design of
-SimpleDB before you write code.
+As before, we **strongly encourage** you to read through this entire document to get a feel for the high-level design of SimpleDB before you write code.
 
 We suggest exercises along this document to guide your implementation, but you may find that a different order makes
 more sense for you. As before, we will grade your assignment by looking at your code and verifying that you have passed
@@ -78,8 +77,7 @@ the test for the ant targets `test` and
 `systemtest`. Note the code only needs to pass the tests we indicate in this lab, not all of unit and system tests. See
 Section 3.4 for a complete discussion of grading and list of the tests you will need to pass.
 
-Here's a rough outline of one way you might proceed with your SimpleDB implementation; more details on the steps in this
-outline, including exercises, are given in Section 2 below.
+Here's a rough outline of one way you might proceed with your SimpleDB implementation; more details on the steps in this outline, including exercises, are given in Section 2 below.
 
 * Implement the operators `Filter` and `Join` and verify that their corresponding tests work. The Javadoc comments for
   these operators contain details about how they should work. We have given you implementations of
@@ -90,21 +88,20 @@ outline, including exercises, are given in Section 2 below.
   computing the average, since SimpleDB only supports integers. StringAggegator only needs to support the COUNT
   aggregate, since the other operations do not make sense for strings.
 
-* Implement the `Aggregate` operator. As with other operators, aggregates implement the `OpIterator` interface so that
+* Implement the `Aggregate` operator. As with(正如) other operators, aggregates implement the `OpIterator` interface so that
   they can be placed in SimpleDB query plans. Note that the output of an `Aggregate` operator is an aggregate value of
   an entire group for each call to `next()`, and that the aggregate constructor takes the aggregation and grouping
   fields.
 
-* Implement the methods related to tuple insertion, deletion, and page eviction in `BufferPool`. You do not need to
-  worry about transactions at this point.
-
+* Implement the methods related to tuple insertion, deletion, and page eviction in `BufferPool`. **You do not need to worry about transactions at this point.**
+  
 * Implement the `Insert` and `Delete` operators. Like all operators,  `Insert` and `Delete` implement
   `OpIterator`, accepting a stream of tuples to insert or delete and outputting a single tuple with an integer field
   that indicates the number of tuples inserted or deleted. These operators will need to call the appropriate methods
   in `BufferPool` that actually modify the pages on disk. Check that the tests for inserting and deleting tuples work
   properly.
 
-Note that SimpleDB does not implement any kind of consistency or integrity checking, so it is possible to insert
+Note that SimpleDB does not implement any kind of consistency or integrity checking(一致性和完整性检查), so it is possible to insert
 duplicate records into a file and there is no way to enforce primary or foreign key constraints.
 
 At this point you should be able to pass the tests in the ant
@@ -126,8 +123,7 @@ from iterator classes, and in its place put `implements OpIterator`.
 
 ### 2.1. Filter and Join
 
-Recall that SimpleDB OpIterator classes implement the operations of the relational algebra. You will now implement two
-operators that will enable you to perform queries that are slightly more interesting than a table scan.
+Recall that SimpleDB OpIterator classes implement the operations of the relational algebra. You will now implement two operators that will enable you to perform queries that are slightly more interesting than a table scan.
 
 * *Filter*: This operator only returns tuples that satisfy a `Predicate` that is specified as part of its constructor.
   Hence, it filters out any tuples that do not match the predicate.
@@ -140,14 +136,14 @@ operators that will enable you to perform queries that are slightly more interes
 
 Implement the skeleton methods in:
 
-***  
+***
 
 * src/java/simpledb/execution/Predicate.java
 * src/java/simpledb/execution/JoinPredicate.java
 * src/java/simpledb/execution/Filter.java
 * src/java/simpledb/execution/Join.java
 
-***  
+***
 
 At this point, your code should pass the unit tests in PredicateTest, JoinPredicateTest, FilterTest, and JoinTest.
 Furthermore, you should be able to pass the system tests FilterTest and JoinTest.
@@ -156,8 +152,7 @@ Furthermore, you should be able to pass the system tests FilterTest and JoinTest
 
 An additional SimpleDB operator implements basic SQL aggregates with a
 `GROUP BY` clause. You should implement the five SQL aggregates
-(`COUNT`, `SUM`, `AVG`, `MIN`,
-`MAX`) and support grouping. You only need to support aggregates over a single field, and grouping by a single field.
+(`COUNT`, `SUM`, `AVG`, `MIN`,`MAX`) and support grouping. You only need to support aggregates over a single field, and grouping by a single field.
 
 In order to calculate aggregates, we use an `Aggregator`
 interface which merges a new tuple into the existing calculation of an aggregate. The `Aggregator` is told during
@@ -174,36 +169,31 @@ do not need to worry about the situation where the number of groups exceeds avai
 
 Implement the skeleton methods in:
 
-***  
+***
 
 * src/java/simpledb/execution/IntegerAggregator.java
 * src/java/simpledb/execution/StringAggregator.java
 * src/java/simpledb/execution/Aggregate.java
 
-***  
+***
 
 At this point, your code should pass the unit tests IntegerAggregatorTest, StringAggregatorTest, and AggregateTest.
 Furthermore, you should be able to pass the AggregateTest system test.
 
 ### 2.3. HeapFile Mutability
 
-Now, we will begin to implement methods to support modifying tables. We begin at the level of individual pages and
-files. There are two main sets of operations:  adding tuples and removing tuples.
+Now, we will begin to implement methods to support modifying tables. We begin at the level of individual pages and files. There are two main sets of operations:  adding tuples and removing tuples.
 
 **Removing tuples:** To remove a tuple, you will need to implement
-`deleteTuple`. Tuples contain `RecordIDs` which allow you to find the page they reside on, so this should be as simple
-as locating the page a tuple belongs to and modifying the headers of the page appropriately.
+`deleteTuple`. Tuples contain `RecordIDs` which allow you to find the page they reside on, so this should be as simple as locating the page a tuple belongs to and modifying the headers of the page appropriately.
 
-**Adding tuples:** The `insertTuple` method in
-`HeapFile.java` is responsible for adding a tuple to a heap file. To add a new tuple to a HeapFile, you will have to
-find a page with an empty slot. If no such pages exist in the HeapFile, you need to create a new page and append it to
-the physical file on disk. You will need to ensure that the RecordID in the tuple is updated correctly.
+**Adding tuples:** The `insertTuple` method in`HeapFile.java` is responsible for adding a tuple to a heap file. To add a new tuple to a HeapFile, you will have to find a page with an empty slot. If no such pages exist in the HeapFile, you need to create a new page and append it to the physical file on disk. You will need to ensure that the RecordID in the tuple is updated correctly.
 
 **Exercise 3.**
 
 Implement the remaining skeleton methods in:
 
-***  
+***
 
 * src/java/simpledb/storage/HeapPage.java
 * src/java/simpledb/storage/HeapFile.java<br>
@@ -225,12 +215,12 @@ implementation of transactions in the next lab will not work properly.
 
 Implement the following skeleton methods in <tt>src/simpledb/BufferPool.java</tt>:
 
-***  
+***
 
 * insertTuple()
 * deleteTuple()
 
-***  
+***
 
 
 These methods should call the appropriate methods in the HeapFile that belong to the table being modified (this extra
@@ -259,14 +249,14 @@ returning a single tuple with one integer field, containing the count.
 
 Implement the skeleton methods in:
 
-***  
+***
 
 * src/java/simpledb/execution/Insert.java
 * src/java/simpledb/execution/Delete.java
 
-***  
+***
 
-At this point, your code should pass the unit tests in InsertTest. We have not provided unit tests for `Delete`.
+At this point, your code should pass the unit tests in InsertTest. We have   not provided unit tests for `Delete`.
 Furthermore, you should be able to pass the InsertTest and DeleteTest system tests.
 
 ### 2.5. Page eviction
@@ -280,8 +270,7 @@ is loaded. The choice of eviction policy is up to you; it is not necessary to do
 policy in the lab writeup.
 
 Notice that `BufferPool` asks you to implement a `flushAllPages()` method. This is not something you would ever need in
-a real implementation of a buffer pool. However, we need this method for testing purposes. You should never call this
-method from any real code.
+a real implementation of a buffer pool. However, we need this method for testing purposes. **You should never call this method from any real code.**
 
 Because of the way we have implemented ScanTest.cacheTest, you will need to ensure that your flushPage and flushAllPages
 methods do no evict pages from the buffer pool to properly pass this test.
@@ -296,7 +285,7 @@ page it evicts.
 
 Fill in the `flushPage()` method and additional helper methods to implement page eviction in:
 
-***  
+***
 
 * src/java/simpledb/storage/BufferPool.java
 
@@ -305,7 +294,7 @@ Fill in the `flushPage()` method and additional helper methods to implement page
 
 
 If you did not implement `writePage()` in
-<tt>HeapFile.java</tt> above, you will also need to do that here. Finally, you should also implement `discardPage()` to
+<tt>HeapFile.java</tt> above, you will also need to do that here. Finally, you should also implement `discardPage()` to 
 remove a page from the buffer pool *without* flushing it to disk. We will not test `discardPage()`
 in this lab, but it will be necessary for future labs.
 

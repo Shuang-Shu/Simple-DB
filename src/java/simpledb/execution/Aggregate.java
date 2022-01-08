@@ -1,6 +1,7 @@
 package simpledb.execution;
 
 import simpledb.common.DbException;
+import simpledb.common.Type;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.transaction.TransactionAbortedException;
@@ -25,13 +26,46 @@ public class Aggregate extends Operator {
      * you with your implementation of readNext().
      *
      * @param child  The OpIterator that is feeding us tuples.
+     *               为本运算提供元组的OpIterator操作符
      * @param afield The column over which we are computing an aggregate.
      * @param gfield The column over which we are grouping the result, or -1 if
      *               there is no grouping
      * @param aop    The aggregation operator to use
      */
+    private OpIterator child;
+    private int groupField;
+    private int aggregateFiled;
+    private Aggregator.Op op;
+    private Aggregator aggregator;
+    private TupleDesc tupleDesc;
+    private OpIterator aggResultIter;
+
     public Aggregate(OpIterator child, int afield, int gfield, Aggregator.Op aop) {
         // some code goes here
+        this.child=child;
+        this.groupField=gfield;
+        this.aggregateFiled=afield;
+        this.op=aop;
+        this.tupleDesc=child.getTupleDesc();
+        if(this.groupField!=-1) {
+            //若需要进行分组
+            if (this.tupleDesc.getFieldType(afield).equals(Type.INT_TYPE)) {
+                this.aggregator = new IntegerAggregator(gfield, this.tupleDesc.getFieldType(this.groupField), afield, this.op);
+            } else {
+                this.aggregator = new StringAggregator(gfield, this.tupleDesc.getFieldType(this.groupField), afield, this.op);
+            }
+        }else{
+            this.aggregator=new IntegerAggregator(this.groupField, null, this.aggregateFiled, this.op);
+        }
+        try {
+            child.open();
+            while (child.hasNext()) {
+                aggregator.mergeTupleIntoGroup(child.next());
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        this.aggResultIter=aggregator.iterator();
     }
 
     /**
@@ -41,7 +75,7 @@ public class Aggregate extends Operator {
      */
     public int groupField() {
         // some code goes here
-        return -1;
+        return this.groupField;
     }
 
     /**
@@ -51,7 +85,7 @@ public class Aggregate extends Operator {
      */
     public String groupFieldName() {
         // some code goes here
-        return null;
+        return this.tupleDesc.getFieldName(groupField);
     }
 
     /**
@@ -59,7 +93,7 @@ public class Aggregate extends Operator {
      */
     public int aggregateField() {
         // some code goes here
-        return -1;
+        return this.aggregateFiled;
     }
 
     /**
@@ -68,7 +102,7 @@ public class Aggregate extends Operator {
      */
     public String aggregateFieldName() {
         // some code goes here
-        return null;
+        return this.tupleDesc.getFieldName(this.aggregateFiled);
     }
 
     /**
@@ -76,7 +110,7 @@ public class Aggregate extends Operator {
      */
     public Aggregator.Op aggregateOp() {
         // some code goes here
-        return null;
+        return this.op;
     }
 
     public static String nameOfAggregatorOp(Aggregator.Op aop) {
@@ -86,6 +120,9 @@ public class Aggregate extends Operator {
     public void open() throws NoSuchElementException, DbException,
             TransactionAbortedException {
         // some code goes here
+        super.open();
+        this.child.open();
+        aggResultIter.open();
     }
 
     /**
@@ -97,11 +134,14 @@ public class Aggregate extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
+        if(this.aggResultIter.hasNext())
+            return this.aggResultIter.next();
         return null;
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
+        this.aggResultIter.rewind();
     }
 
     /**
@@ -117,22 +157,27 @@ public class Aggregate extends Operator {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        return this.aggResultIter.getTupleDesc();
     }
 
     public void close() {
         // some code goes here
+        super.close();
+        this.aggResultIter.close();
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
-        return null;
+        OpIterator[] result={this.child};
+        return result;
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+        for(int i=0;i<children.length;++i)
+            this.child=children[i];
     }
 
 }

@@ -80,6 +80,8 @@ public class HeapPageId implements PageId {
 
         return data;
     }
+    //tableId：表明表的Id
     private int tableId;
+    //page的编号
     private int pageNo;
 }

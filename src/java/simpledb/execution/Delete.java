@@ -3,10 +3,7 @@ package simpledb.execution;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.Type;
-import simpledb.storage.BufferPool;
-import simpledb.storage.IntField;
-import simpledb.storage.Tuple;
-import simpledb.storage.TupleDesc;
+import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -29,25 +26,43 @@ public class Delete extends Operator {
      * @param child
      *            The child operator from which to read tuples for deletion
      */
+    private TransactionId t;
+    private OpIterator child;
+    private boolean isOpen;
+    private boolean isInit;
+
     public Delete(TransactionId t, OpIterator child) {
         // some code goes here
+        this.t=t;
+        this.child=child;
+        this.isOpen=false;
+        this.isInit=true;
     }
 
     public TupleDesc getTupleDesc() {
         // some code goes here
-        return null;
+        Type[] types={Type.INT_TYPE};
+        return new TupleDesc(types);
     }
 
     public void open() throws DbException, TransactionAbortedException {
         // some code goes here
+        super.open();
+        this.isOpen=true;
+        this.child.open();
     }
 
     public void close() {
         // some code goes here
+        super.close();
+        this.isOpen=false;
+        this.child.close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
         // some code goes here
+        this.child.rewind();
+        this.isInit=true;
     }
 
     /**
@@ -61,18 +76,35 @@ public class Delete extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+        int count=0;
+        while (this.child.hasNext()){
+            try {
+                Database.getBufferPool().deleteTuple(this.t, this.child.next());
+                count++;
+            }
+            catch (Exception e){
+            }
+        }
+        if(!this.isInit)
+            return null;
+        Tuple tuple=new Tuple(this.getTupleDesc());
+        Field field=new IntField(count);
+        tuple.setField(0, field);
+        this.isInit=false;
+        return tuple;
     }
 
     @Override
     public OpIterator[] getChildren() {
         // some code goes here
+        OpIterator[] opIterators={this.child};
         return null;
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
+        this.child=children[0];
     }
 
 }

@@ -35,7 +35,7 @@ public interface OpIterator extends Serializable{
    *
    * @return the next tuple in the iteration.
    * @throws NoSuchElementException if there are no more tuples.
-   * @throws IllegalStateException If the iterator has not been opened
+   * @throws IllegalStateException If the iterato1r has not been opened
    */
   Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException;
 
