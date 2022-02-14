@@ -15,6 +15,141 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
+class Pair{
+    private Set<TransactionId> tids;
+    private Permissions permission;
+
+    public Pair(){
+        tids=new HashSet<TransactionId>();
+        permission=null;
+    }
+
+    public Set<TransactionId> getTids() {
+        return tids;
+    }
+
+    public Permissions getPermission() {
+        return permission;
+    }
+
+    public void setTids(Set<TransactionId> tids) {
+        this.tids = tids;
+    }
+
+    public void setPermission(Permissions permission) {
+        this.permission = permission;
+    }
+}
+
+class LockManager{
+    private Map<PageId, Pair> locks;
+
+    public LockManager(){
+        locks=new HashMap<PageId, Pair>();
+    }
+
+    public void grantAndBlockLock(TransactionId tid, PageId pid, Permissions permissions){
+        // 尝试授予锁
+        if(grantLock(tid, pid, permissions))
+            return;
+        else {
+            // 阻塞，等待锁被释放
+
+        }
+    }
+    /*
+    * 用于给事务tid授予pid上的锁，若失败，则返回false；否则返回true
+    * */
+    public boolean grantLock(TransactionId tid, PageId pid, Permissions permissions){
+        Permissions temp=peekPermission(pid);
+        if(temp==null){
+            // 若目标pid没有锁
+            Pair pair=new Pair();
+            pair.setPermission(permissions);
+            Set<TransactionId> set=pair.getTids();
+            set.add(tid);
+            locks.put(pid, pair);
+            return true;
+        }else if(temp==Permissions.READ_ONLY){
+            // 若目标pid有共享锁
+            if(permissions==Permissions.READ_WRITE){
+                // 阻塞，等待没有事务持有pid上的锁
+                return false;
+            }else {
+                // 授予共享锁
+                locks.get(pid).getTids().add(tid);
+                return true;
+            }
+        }else {
+            // 若目标pid有排它锁
+            return false;
+        }
+    }
+
+    /*
+    * 查看pid对应的锁类型，若无锁则返回null
+    * */
+    public Permissions peekPermission(PageId pid){
+        if(locks.containsKey(pid))
+            return locks.get(pid).getPermission();
+        else
+            return null;
+    }
+
+    /*
+    * 释放tid在pid上的锁
+    * */
+    public void releaseLock(TransactionId tid, PageId pid){
+        // 1 判断pid是否有锁
+        if(!locks.containsKey(pid))
+            return;
+        else{
+            Pair temp=locks.get(pid);
+            Set<TransactionId> set=temp.getTids();
+            if(!set.contains(tid))
+                return;
+            else{
+                set.remove(tid);
+                if(set.isEmpty()) {
+                    locks.remove(pid);
+                    return;
+                }else {
+                    return;
+                }
+            }
+        }
+    }
+
+    /*
+    * 升级tid在pid上的锁类型，成功返回ture，否则返回false
+    *
+     */
+    public boolean upgradeLock(TransactionId tid, PageId pid){
+        if(!locks.containsKey(pid)){
+            // 此时pid尚未加锁，为之添加共享锁
+            Pair pair=new Pair();
+            Set<TransactionId>set =pair.getTids();
+            set.add(tid);
+            pair.setPermission(Permissions.READ_ONLY);
+            locks.put(pid, pair);
+            return true;
+        }else {
+            if(locks.get(pid).getPermission()==Permissions.READ_WRITE){
+                // 此时权限为排它锁，不升级权限
+                return true;
+            }else {
+                // 此时权限为共享锁，检查是否有多个事务共享锁
+                if(locks.get(pid).getTids().size()>1)
+                    return false;
+                else{
+                    locks.get(pid).setPermission(Permissions.READ_WRITE);
+                    return true;
+                }
+            }
+        }
+    }
+}
+
 /**
  * BufferPool manages the reading and writing of pages into memory from
  * disk. Access methods call into it to retrieve pages, and it fetches
@@ -80,6 +215,7 @@ public class BufferPool {
     public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
+        // 要考虑读取的权限问题
         //在bufferPool中查找对应的pid
         Iterator<Page> iterator=this.bufferPool.iterator();
         while(iterator.hasNext()){

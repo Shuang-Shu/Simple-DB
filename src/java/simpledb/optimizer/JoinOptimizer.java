@@ -227,12 +227,13 @@ public class JoinOptimizer {
                 for (T t : v) {
                     Set<T> news = new HashSet<>(s);
                     if (news.add(t))
+                        // 这里也可能add失败
+                        // 总之，这里利用循环，从简单的单个元素开始，逐渐遍历所有可能的集合
                         newels.add(news);
                 }
             }
             els = newels;
         }
-
         return els;
     }
 
@@ -262,37 +263,15 @@ public class JoinOptimizer {
             throws ParsingException {
         // some code goes here
         // 将动态规划中长度为1的连接直接加入PlanCache
-        Set<Set<LogicalJoinNode>> sigleJoinSet=enumerateSubsets(joins, 1);
-        for(Set<LogicalJoinNode> set:sigleJoinSet){
-            Iterator<LogicalJoinNode> iterator=set.iterator();
-            LogicalJoinNode tempNode=iterator.next();
-            // 这是所有的单个JoinNode
-            int card1,card2;
-            double cost1, cost2;
-            boolean leftPkey,rightPkey;
-
-            leftPkey=isPkey(tempNode.t1Alias, tempNode.f1PureName);
-            rightPkey=isPkey(tempNode.t2Alias, tempNode.f2PureName);
-            String tableName1=Database.getCatalog().getTableName(p.getTableId(tempNode.t1Alias));
-            String tableName2=Database.getCatalog().getTableName(p.getTableId(tempNode.t2Alias));
-            card1=stats.get(tableName1).estimateTableCardinality(filterSelectivities.get(tempNode.t1Alias));
-            card2=stats.get(tableName2).estimateTableCardinality(filterSelectivities.get(tempNode.t2Alias));
-
-            cost1=stats.get(tableName1).estimateScanCost();
-            cost2=stats.get(tableName2).estimateScanCost();
-
-            int card=estimateJoinCardinality(tempNode, card1, card2, leftPkey, rightPkey, stats);
-            double cost=estimateJoinCost(tempNode, card1, card2, cost1, cost2);
-            List<LogicalJoinNode> list=new ArrayList<>();
-            list.add(tempNode);
-            planCache.addPlan(set, cost, card, list);
-        }
-
-        for(int i=2;i<=joins.size();++i){
+        Set<LogicalJoinNode> wholeSet=null;
+        planCache=new PlanCache();
+        for(int i=1;i<=joins.size();++i){
             // 获取长度为i的joinOrder子集合
             Set<Set<LogicalJoinNode>> subJoinPlanSet=enumerateSubsets(joins, i);
             for(Set<LogicalJoinNode> set:subJoinPlanSet){
                 // 遍历每一个子查询集合
+                if(i==joins.size())
+                    wholeSet=set;
                 CostCard bestSubPlan=new CostCard();
                 bestSubPlan.cost=Double.MAX_VALUE;
                 for(LogicalJoinNode logicalJoinNode:set){
@@ -300,12 +279,13 @@ public class JoinOptimizer {
                     if(temp!=null)
                         bestSubPlan=temp;
                 }
-                planCache.addPlan(set, bestSubPlan.cost, bestSubPlan.card, bestSubPlan.plan);
+                if(bestSubPlan.plan!=null) {
+                    planCache.addPlan(set, bestSubPlan.cost, bestSubPlan.card, bestSubPlan.plan);
+                }
             }
         }
-        //Replace the following
-        Set<Set<LogicalJoinNode>> tempSet=enumerateSubsets(joins, joins.size());
-        return planCache.getOrder(tempSet.iterator().next());
+        return planCache.getOrder(wholeSet);
+
     }
 
     // ===================== Private Methods =================================

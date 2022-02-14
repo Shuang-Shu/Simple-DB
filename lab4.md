@@ -10,8 +10,7 @@ code to track the locks held by each transaction and grant
 locks to transactions as they are needed.
 
 The remainder of this document describes what is involved in
-adding transaction support and provides a basic outline of how
-you might add this support to your database.
+adding transaction support and provides a basic outline of how you might add this support to your database.
 
 As with the previous lab, we recommend that you start as early as possible.
 Locking and transactions can be quite tricky to debug!
@@ -20,8 +19,7 @@ Locking and transactions can be quite tricky to debug!
 
 You should begin with the code you submitted for Lab 3 (if you did not
 submit code for Lab 3, or your solution didn't work properly, contact us to
-discuss options).  Additionally, we are providing extra test cases
-for this lab that are not in the original code distribution you received. We reiterate
+discuss options).  Additionally, we are providing extra test cases for this lab that are not in the original code distribution you received. We reiterate
 that the unit tests we provide are to help guide your implementation along,
 but they are not intended to be comprehensive or to establish correctness.
 
@@ -79,7 +77,7 @@ As we discussed in class, this means that:
    are locked by an uncommitted transaction (this is NO STEAL).
 *  On transaction commit, you should force dirty pages to disk (e.g.,
    write the pages out) (this is FORCE).
-   
+
 To further simplify your life, you may assume that SimpleDB will not crash
 while processing a `transactionComplete` command.  Note that
 these three points mean that you do not need to implement log-based
@@ -102,8 +100,7 @@ You will need to create data structures that keep track of which locks
 each transaction holds and check to see if a lock should be granted
 to a transaction when it is requested.
 
-You will need to implement shared and exclusive locks; recall that these
-work as follows:
+You will need to implement shared and exclusive locks; recall that these work as follows:
 
 *  Before a transaction can read an object, it must have a shared lock on it.
 *  Before a transaction can write an object, it must have an exclusive lock on it.
@@ -116,8 +113,7 @@ work as follows:
 If a transaction requests a lock that cannot be immediately granted, your code
 should *block*, waiting for that lock to become available (i.e., be
 released by another transaction running in a different thread).
-Be careful about race conditions in your lock implementation --- think about
-how concurrent invocations to your lock may affect the behavior. 
+Be careful about race conditions in your lock implementation --- think about how concurrent invocations to your lock may affect the behavior. 
 (you way wish to read about <a href="http://docs.oracle.com/javase/tutorial/essential/concurrency/sync.html">
 Synchronization</a> in Java).
 
@@ -455,8 +451,8 @@ You can also post on the class page on Piazza if you feel you have run into a bu
   autograder score until you fix them. If this is an issue for you, contact us to discuss options.
   
 * Given that this lab deals with concurrency, we will rerun the autograder after the due date to discourage
-trying buggy code until lucky. It is your responsibility to ensure that your code **reliably** passes
-the tests.
+  trying buggy code until lucky. It is your responsibility to ensure that your code **reliably** passes
+  the tests.
   
 * This lab has a higher percentage of manual grading at 50% compared to previous labs. Specifically, we will be
 very unhappy if your concurrency handling is bogus (e.g., inserting Thread.sleep(1000) until a race disappears).
