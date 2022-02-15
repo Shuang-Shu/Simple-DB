@@ -4,6 +4,7 @@ import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
 import simpledb.common.DeadlockException;
+import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -14,139 +15,129 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
-class Pair{
-    private Set<TransactionId> tids;
-    private Permissions permission;
+class Pair<T1, T2>{
+    private T1 t1;
+    private T2 t2;
 
-    public Pair(){
-        tids=new HashSet<TransactionId>();
-        permission=null;
+    public T1 getT1() {
+        return t1;
     }
 
-    public Set<TransactionId> getTids() {
-        return tids;
+    public void setT1(T1 t1) {
+        this.t1 = t1;
     }
 
-    public Permissions getPermission() {
-        return permission;
+    public T2 getT2() {
+        return t2;
     }
 
-    public void setTids(Set<TransactionId> tids) {
-        this.tids = tids;
-    }
-
-    public void setPermission(Permissions permission) {
-        this.permission = permission;
+    public void setT2(T2 t2) {
+        this.t2 = t2;
     }
 }
 
+// 锁管理器，管理Page层面上的锁
 class LockManager{
-    private Map<PageId, Pair> locks;
+    // 存放了持有PageId对应Page的锁的Transaction 集合以及锁类型
+    Map<PageId, Pair<Set<TransactionId>, Permissions>> locks;
+    // 存放了PageId对应的等待条件
+    Map<PageId, Condition> conditionMap;
+    Lock managerLock;
 
+    // 构造函数
     public LockManager(){
-        locks=new HashMap<PageId, Pair>();
+        locks=new HashMap<>();
+        conditionMap=new HashMap<>();
+        managerLock=new ReentrantLock();
     }
 
-    public void grantAndBlockLock(TransactionId tid, PageId pid, Permissions permissions){
-        // 尝试授予锁
-        if(grantLock(tid, pid, permissions))
-            return;
-        else {
-            // 阻塞，等待锁被释放
-
-        }
-    }
-    /*
-    * 用于给事务tid授予pid上的锁，若失败，则返回false；否则返回true
-    * */
-    public boolean grantLock(TransactionId tid, PageId pid, Permissions permissions){
-        Permissions temp=peekPermission(pid);
-        if(temp==null){
-            // 若目标pid没有锁
-            Pair pair=new Pair();
-            pair.setPermission(permissions);
-            Set<TransactionId> set=pair.getTids();
-            set.add(tid);
-            locks.put(pid, pair);
-            return true;
-        }else if(temp==Permissions.READ_ONLY){
-            // 若目标pid有共享锁
-            if(permissions==Permissions.READ_WRITE){
-                // 阻塞，等待没有事务持有pid上的锁
-                return false;
-            }else {
-                // 授予共享锁
-                locks.get(pid).getTids().add(tid);
-                return true;
-            }
-        }else {
-            // 若目标pid有排它锁
+    // 检验申请的permissons与pageId当前的锁是否相容
+    public boolean isCompatible(Permissions permissions, PageId pageId){
+        if(!locks.containsKey(pageId))return true;
+        if(permissions==Permissions.READ_ONLY)
+            if(locks.get(pageId).getT2()==Permissions.READ_ONLY)return true;
             return false;
-        }
     }
 
-    /*
-    * 查看pid对应的锁类型，若无锁则返回null
-    * */
-    public Permissions peekPermission(PageId pid){
-        if(locks.containsKey(pid))
-            return locks.get(pid).getPermission();
-        else
-            return null;
-    }
-
-    /*
-    * 释放tid在pid上的锁
-    * */
-    public void releaseLock(TransactionId tid, PageId pid){
-        // 1 判断pid是否有锁
-        if(!locks.containsKey(pid))
+    // 尝试获取锁，若成功则返回；否则阻塞
+    public void requestLock(TransactionId transactionId, PageId pageId, Permissions permissions){
+        if(!locks.containsKey(pageId)){
+            // 该page的锁未被获取，设置其被获取，同时新增一个等待条件（起到了事务请求队列的作用）
+            Pair<Set<TransactionId>, Permissions> pair=new Pair<>();
+            Set<TransactionId> transactionSet=new HashSet<>();
+            transactionSet.add(transactionId);
+            pair.setT1(transactionSet);
+            pair.setT2(permissions);
+            locks.put(pageId, pair);
+            // 新增等待条件
+            conditionMap.put(pageId, managerLock.newCondition());
             return;
-        else{
-            Pair temp=locks.get(pid);
-            Set<TransactionId> set=temp.getTids();
-            if(!set.contains(tid))
-                return;
-            else{
-                set.remove(tid);
-                if(set.isEmpty()) {
-                    locks.remove(pid);
-                    return;
-                }else {
-                    return;
+        }else{
+            // 该page已上锁
+            // 不相容的情况，进入阻塞状态
+            while (!isCompatible(permissions, pageId)) {
+                try {
+                    // 该方法会抛出java.lang.IllegalMonitorStateException异常，为何
+                    conditionMap.get(pageId).await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
+            }
+            // 若相容，则将该事务放入拥有page锁的集合中
+            if(locks.containsKey(pageId)){
+                // 此时集合不为空，直接放入即可，不需要处理事务
+                locks.get(pageId).getT1().add(transactionId);
+            }else {
+                // 此时拥有pageId对应的page的锁的事务集合为空，pageId已经从locks和conditionMap中删除，需要重新获取锁并设置等待条件
+                requestLock(transactionId, pageId, permissions);
             }
         }
     }
 
-    /*
-    * 升级tid在pid上的锁类型，成功返回ture，否则返回false
-    *
-     */
-    public boolean upgradeLock(TransactionId tid, PageId pid){
-        if(!locks.containsKey(pid)){
-            // 此时pid尚未加锁，为之添加共享锁
-            Pair pair=new Pair();
-            Set<TransactionId>set =pair.getTids();
-            set.add(tid);
-            pair.setPermission(Permissions.READ_ONLY);
-            locks.put(pid, pair);
-            return true;
-        }else {
-            if(locks.get(pid).getPermission()==Permissions.READ_WRITE){
-                // 此时权限为排它锁，不升级权限
-                return true;
-            }else {
-                // 此时权限为共享锁，检查是否有多个事务共享锁
-                if(locks.get(pid).getTids().size()>1)
-                    return false;
-                else{
-                    locks.get(pid).setPermission(Permissions.READ_WRITE);
-                    return true;
-                }
-            }
+    // 释放锁，释放事务在Page上的锁
+    public void releaseLock(TransactionId transactionId, PageId pageId){
+        if(!locks.containsKey(pageId))return;
+        locks.get(pageId).getT1().remove(pageId);
+        Condition temp=conditionMap.get(pageId);
+        if(locks.get(pageId).getT1().isEmpty()){
+            // 此时拥有pageId对应的page的锁的事务集合为空，将其从locks以及conditionMap中删除
+            locks.remove(pageId);
+            conditionMap.remove(pageId);
         }
+        // 通知所有在该pageId上等待的事务进行尝试
+        temp.signalAll();
+    }
+
+    /*升级事务在Page上的锁，成功则返回true，否则返回false
+     升级的规则是:
+        如果该page未被上锁，则将其升级为共享锁
+        如果该page有共享锁，检查拥有pageId对应的page的锁的事务集合中是否有且仅有transactionId对应的事务，有则升级，否则返回false
+     */
+    public boolean upgradeLock(TransactionId transactionId, PageId pageId){
+        if(!locks.containsKey(pageId)){
+            requestLock(transactionId, pageId, Permissions.READ_ONLY);
+            return true;
+        }
+        if(locks.get(pageId).getT2()==Permissions.READ_WRITE)
+            return false;
+        if(locks.get(pageId).getT1().size()==1&&locks.get(pageId).getT1().contains(transactionId)) {
+            locks.get(pageId).setT2(Permissions.READ_WRITE);
+            return true;
+        }
+        else 
+            return false;
+    }
+
+    // 查看事务transactionId是否持有pageId上的锁
+    public Permissions peekPermisson(TransactionId transactionId, PageId pageId){
+        if(locks.containsKey(pageId))
+            if(locks.get(pageId).getT1().contains(transactionId))
+                return locks.get(pageId).getT2();
+        return null;
     }
 }
 
@@ -172,6 +163,7 @@ public class BufferPool {
     other classes. BufferPool should use the numPages argument to the
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
+    private static LockManager lockManager=new LockManager();
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -212,11 +204,12 @@ public class BufferPool {
      * @param pid the ID of the requested page
      * @param perm the requested permissions on the page
      */
-    public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
+    public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // some code goes here
         // 要考虑读取的权限问题
         //在bufferPool中查找对应的pid
+        lockManager.requestLock(tid, pid, perm);
         Iterator<Page> iterator=this.bufferPool.iterator();
         while(iterator.hasNext()){
             Page temp=iterator.next();
@@ -253,6 +246,7 @@ public class BufferPool {
     public  void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        lockManager.releaseLock(tid, pid);
     }
 
     /**
@@ -266,9 +260,11 @@ public class BufferPool {
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
-    public boolean holdsLock(TransactionId tid, PageId p) {
+    public boolean holdsLock(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        if(lockManager.peekPermisson(tid, pid)!=null)
+            return true;
         return false;
     }
 

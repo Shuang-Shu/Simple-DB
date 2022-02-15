@@ -213,7 +213,7 @@ public class HeapFile implements DbFile {
         HeapPage heapPage;
         for(int i=0;i<numPages;++i){
             HeapPageId heapPageId=new HeapPageId(getId(), i);
-            heapPage=((HeapPage)Database.getBufferPool().getPage(tid, heapPageId, null));
+            heapPage=((HeapPage)Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE));
             if(heapPage.getNumEmptySlots()>0){
                 heapPage.insertTuple(t);
                 list.add(heapPage);
