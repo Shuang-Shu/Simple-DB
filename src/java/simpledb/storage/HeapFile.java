@@ -4,6 +4,7 @@ import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.Debug;
 import simpledb.common.Permissions;
+import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -27,19 +28,23 @@ import java.util.*;
  * @author Sam Madden
  */
 public class HeapFile implements DbFile {
+
     class HeapFileIterator implements DbFileIterator{
         private int pageNo=0;
         private Iterator<Tuple> iterator=null;
         private HeapPage page=null;
         private int totalPageNumber=0;
         private boolean isOpen=false;
+        private TransactionId transactionId;
 
         public HeapFileIterator(){
             try {
                 HeapPageId pid=new HeapPageId(getId(), this.pageNo);
-                this.page=(HeapPage)Database.getBufferPool().getPage(null, pid, null);
+                this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, null);
                 this.totalPageNumber=(int)(heapFile.length()/Database.getBufferPool().getPageSize());
                 this.iterator=this.page.iterator();
+                // 事务的ID
+                transactionId=new TransactionId();
             }catch (Exception e){
                 e.printStackTrace();
             }
@@ -60,7 +65,7 @@ public class HeapFile implements DbFile {
                     else {
                         this.pageNo+=1;
                         HeapPageId pid=new HeapPageId(getId(), this.pageNo);
-                        this.page=(HeapPage)Database.getBufferPool().getPage(null, pid, null);
+                        this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_ONLY);
                         this.iterator=this.page.iterator();
                         return this.hasNext();
                     }
@@ -78,7 +83,7 @@ public class HeapFile implements DbFile {
                     if (!this.iterator.hasNext()) {
                         this.pageNo += 1;
                         HeapPageId pid = new HeapPageId(getId(), this.pageNo);
-                        this.page = (HeapPage) Database.getBufferPool().getPage(null, pid, null);
+                        this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_WRITE);
                         this.iterator = this.page.iterator();
                     }
                     return this.iterator.next();
@@ -94,7 +99,7 @@ public class HeapFile implements DbFile {
                 this.pageNo=0;
                 try {
                     HeapPageId pid=new HeapPageId(getId(), this.pageNo);
-                    this.page=(HeapPage)Database.getBufferPool().getPage(null, pid, null);
+                    this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_ONLY);
                     this.totalPageNumber=(int)(heapFile.length()/Database.getBufferPool().getPageSize());
                     this.iterator=this.page.iterator();
                 }catch (Exception e){
@@ -238,7 +243,7 @@ public class HeapFile implements DbFile {
         // some code goes here
         // not necessary for lab1
         ArrayList<Page> list=new ArrayList<>();
-        HeapPage heapPage=(HeapPage) Database.getBufferPool().getPage(tid, t.getRecordId().getPageId(), null);
+        HeapPage heapPage=(HeapPage) Database.getBufferPool().getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
         heapPage.deleteTuple(t);
         list.add(heapPage);
         return list;

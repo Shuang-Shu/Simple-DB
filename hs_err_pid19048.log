@@ -1,0 +1,205 @@
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (mmap) failed to map 268435456 bytes for Failed to commit area from 0x0000000700a00000 to 0x0000000710a00000 of length 268435456.
+# Possible reasons:
+#   The system is out of physical RAM or swap space
+#   The process is running with CompressedOops enabled, and the Java Heap may be blocking the growth of the native heap
+# Possible solutions:
+#   Reduce memory load on the system
+#   Increase physical memory or swap space
+#   Check if swap backing store is full
+#   Decrease Java heap size (-Xmx/-Xms)
+#   Decrease number of Java threads
+#   Decrease Java thread stack sizes (-Xss)
+#   Set larger code cache with -XX:ReservedCodeCacheSize=
+#   JVM is running with Zero Based Compressed Oops mode in which the Java heap is
+#     placed in the first 32GB address space. The Java Heap base address is the
+#     maximum limit for the native heap growth. Please use -XX:HeapBaseMinAddress
+#     to set the Java Heap base and to place the Java Heap above 32GB virtual address.
+# This output file may be truncated or incomplete.
+#
+#  Out of Memory Error (./open/src/hotspot/os/windows/os_windows.cpp:3315), pid=19048, tid=5364
+#
+# JRE version:  (14.0.1+7) (build )
+# Java VM: OpenJDK 64-Bit Server VM (14.0.1+7, mixed mode, sharing, tiered, compressed oops, g1 gc, windows-amd64)
+# No core dump will be written. Minidumps are not enabled by default on client versions of Windows
+#
+
+---------------  S U M M A R Y ------------
+
+Command Line: -agentlib:jdwp=transport=dt_socket,address=127.0.0.1:63119,suspend=y,server=n -ea -Didea.test.cyclic.buffer.size=1048576 -javaagent:C:\Users\asus\AppData\Local\JetBrains\IdeaIC2020.1\captureAgent\debugger-agent.jar -Dfile.encoding=UTF-8 com.intellij.rt.junit.JUnitStarter -ideVersion5 -junit4 simpledb.LockingTest
+
+Host: Intel(R) Core(TM) i5-7300HQ CPU @ 2.50GHz, 4 cores, 15G,  Windows 10 , 64 bit Build 19041 (10.0.19041.1566)
+Time: Tue Mar 22 21:05:44 2022 中国标准时间 elapsed time: 0 seconds (0d 0h 0m 0s)
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x000001ef07893800):  JavaThread "Unknown thread" [_thread_in_vm, id=5364, stack(0x000000ae98100000,0x000000ae98200000)]
+
+Stack: [0x000000ae98100000,0x000000ae98200000]
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
+V  [jvm.dll+0x5f840a]
+V  [jvm.dll+0x741e4a]
+V  [jvm.dll+0x7435ff]
+V  [jvm.dll+0x743c43]
+V  [jvm.dll+0x20d288]
+V  [jvm.dll+0x5f57ba]
+V  [jvm.dll+0x5ea615]
+V  [jvm.dll+0x2c7e9c]
+V  [jvm.dll+0x2c7cd2]
+V  [jvm.dll+0x2cdbbc]
+V  [jvm.dll+0x313ff8]
+V  [jvm.dll+0x313720]
+V  [jvm.dll+0x2a092a]
+V  [jvm.dll+0x2a1a79]
+V  [jvm.dll+0x71f718]
+V  [jvm.dll+0x321c44]
+V  [jvm.dll+0x700b0c]
+V  [jvm.dll+0x392dff]
+V  [jvm.dll+0x394e71]
+C  [jli.dll+0x523b]
+C  [ucrtbase.dll+0x21bb2]
+C  [KERNEL32.DLL+0x17034]
+C  [ntdll.dll+0x52651]
+
+
+---------------  P R O C E S S  ---------------
+
+Threads class SMR info:
+_java_thread_list=0x00007ffd3d9f3078, length=0, elements={
+}
+
+Java Threads: ( => current thread )
+
+Other Threads:
+  0x000001ef078f9000 GCTaskThread "GC Thread#0" [stack: 0x000000ae98200000,0x000000ae98300000] [id=11856]
+  0x000001ef0791a800 ConcurrentGCThread "G1 Main Marker" [stack: 0x000000ae98300000,0x000000ae98400000] [id=18020]
+  0x000001ef0791c000 ConcurrentGCThread "G1 Conc#0" [stack: 0x000000ae98400000,0x000000ae98500000] [id=21724]
+
+[error occurred during error reporting (printing all threads), id 0xc0000005, EXCEPTION_ACCESS_VIOLATION (0xc0000005) at pc=0x00007ffd3d221257]
+
+VM state:not at safepoint (not fully initialized)
+
+VM Mutex/Monitor currently owned by a thread:  ([mutex/lock_event])
+[0x000001ef07890120] Heap_lock - owner thread: 0x000001ef07893800
+
+Heap address: 0x0000000700a00000, size: 4086 MB, Compressed Oops mode: Zero based, Oop shift amount: 3
+Narrow klass base: 0x0000000000000000, Narrow klass shift: 0
+
+GC Heap History (0 events):
+No events
+
+Deoptimization events (0 events):
+No events
+
+Classes unloaded (0 events):
+No events
+
+Classes redefined (0 events):
+No events
+
+Internal exceptions (0 events):
+No events
+
+Events (2 events):
+Event: 0.048 Loaded shared library C:\Program Files\Java\jdk-14.0.1\bin\java.dll
+Event: 0.049 Loaded shared library C:\Program Files\Java\jdk-14.0.1\bin\zip.dll
+
+
+Dynamic libraries:
+0x00007ff63c1e0000 - 0x00007ff63c1ed000 	C:\Program Files\Java\jdk-14.0.1\bin\java.exe
+0x00007ffda5cf0000 - 0x00007ffda5ee5000 	C:\WINDOWS\SYSTEM32\ntdll.dll
+0x00007ffda5ad0000 - 0x00007ffda5b8e000 	C:\WINDOWS\System32\KERNEL32.DLL
+0x00007ffda34b0000 - 0x00007ffda3778000 	C:\WINDOWS\System32\KERNELBASE.dll
+0x00007ffda39f0000 - 0x00007ffda3af0000 	C:\WINDOWS\System32\ucrtbase.dll
+0x00007ffd8a530000 - 0x00007ffd8a548000 	C:\Program Files\Java\jdk-14.0.1\bin\jli.dll
+0x00007ffda4fd0000 - 0x00007ffda5170000 	C:\WINDOWS\System32\USER32.dll
+0x00007ffda3c90000 - 0x00007ffda3cb2000 	C:\WINDOWS\System32\win32u.dll
+0x00007ffda58f0000 - 0x00007ffda591b000 	C:\WINDOWS\System32\GDI32.dll
+0x00007ffda38e0000 - 0x00007ffda39eb000 	C:\WINDOWS\System32\gdi32full.dll
+0x00007ffda3bf0000 - 0x00007ffda3c8d000 	C:\WINDOWS\System32\msvcp_win.dll
+0x00007ffd8a550000 - 0x00007ffd8a565000 	C:\Program Files\Java\jdk-14.0.1\bin\VCRUNTIME140.dll
+0x00007ffd89c70000 - 0x00007ffd89f0a000 	C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.19041.1110_none_60b5254171f9507e\COMCTL32.dll
+0x00007ffda47e0000 - 0x00007ffda487e000 	C:\WINDOWS\System32\msvcrt.dll
+0x00007ffda4450000 - 0x00007ffda4480000 	C:\WINDOWS\System32\IMM32.DLL
+0x00007ffd6e570000 - 0x00007ffd6e60b000 	C:\Program Files\Java\jdk-14.0.1\bin\msvcp140.dll
+0x00007ffd3cf70000 - 0x00007ffd3da8e000 	C:\Program Files\Java\jdk-14.0.1\bin\server\jvm.dll
+0x00007ffda5b90000 - 0x00007ffda5c3e000 	C:\WINDOWS\System32\ADVAPI32.dll
+0x00007ffda56c0000 - 0x00007ffda575c000 	C:\WINDOWS\System32\sechost.dll
+0x00007ffda5760000 - 0x00007ffda5885000 	C:\WINDOWS\System32\RPCRT4.dll
+0x00007ffda3d50000 - 0x00007ffda3d58000 	C:\WINDOWS\System32\PSAPI.DLL
+0x00007ffd8c520000 - 0x00007ffd8c529000 	C:\WINDOWS\SYSTEM32\WSOCK32.dll
+0x00007ffda5c40000 - 0x00007ffda5cab000 	C:\WINDOWS\System32\WS2_32.dll
+0x00007ffd988a0000 - 0x00007ffd988c7000 	C:\WINDOWS\SYSTEM32\WINMM.dll
+0x00007ffd9b5a0000 - 0x00007ffd9b5aa000 	C:\WINDOWS\SYSTEM32\VERSION.dll
+0x00007ffda1d00000 - 0x00007ffda1d12000 	C:\WINDOWS\SYSTEM32\kernel.appcore.dll
+0x00007ffd9cd20000 - 0x00007ffd9cd2a000 	C:\Program Files\Java\jdk-14.0.1\bin\jimage.dll
+0x00007ffda1810000 - 0x00007ffda19f4000 	C:\WINDOWS\SYSTEM32\DBGHELP.DLL
+0x00007ffd91960000 - 0x00007ffd9198c000 	C:\WINDOWS\SYSTEM32\dbgcore.DLL
+0x00007ffda3cc0000 - 0x00007ffda3d42000 	C:\WINDOWS\System32\bcryptPrimitives.dll
+0x00007ffd8ad90000 - 0x00007ffd8adc8000 	C:\Program Files\Java\jdk-14.0.1\bin\jdwp.dll
+0x00007ffd7d040000 - 0x00007ffd7d065000 	C:\Program Files\Java\jdk-14.0.1\bin\java.dll
+0x00007ffd99430000 - 0x00007ffd9943e000 	C:\Program Files\Java\jdk-14.0.1\bin\instrument.dll
+0x00007ffd82640000 - 0x00007ffd82656000 	C:\Program Files\Java\jdk-14.0.1\bin\zip.dll
+
+dbghelp: loaded successfully - version: 4.0.5 - missing functions: none
+symbol engine: initialized successfully - sym options: 0x614 - pdb path: .;C:\Program Files\Java\jdk-14.0.1\bin;C:\WINDOWS\SYSTEM32;C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.19041.1110_none_60b5254171f9507e;C:\Program Files\Java\jdk-14.0.1\bin\server
+
+VM Arguments:
+jvm_args: -agentlib:jdwp=transport=dt_socket,address=127.0.0.1:63119,suspend=y,server=n -ea -Didea.test.cyclic.buffer.size=1048576 -javaagent:C:\Users\asus\AppData\Local\JetBrains\IdeaIC2020.1\captureAgent\debugger-agent.jar -Dfile.encoding=UTF-8 
+java_command: com.intellij.rt.junit.JUnitStarter -ideVersion5 -junit4 simpledb.LockingTest
+java_class_path (initial): E:\IntelliJ IDEA Community Edition 2020.1\lib\idea_rt.jar;E:\IntelliJ IDEA Community Edition 2020.1\plugins\junit\lib\junit5-rt.jar;E:\IntelliJ IDEA Community Edition 2020.1\plugins\junit\lib\junit-rt.jar;E:\mitDB\simple-db-hw-2021-master\out\test\simple-db-hw-2021-master;E:\mitDB\simple-db-hw-2021-master\lib\zql.jar;E:\mitDB\simple-db-hw-2021-master\lib\hamcrest-core-1.3.jar;E:\mitDB\simple-db-hw-2021-master\lib\jline-0.9.94.jar;E:\mitDB\simple-db-hw-2021-master\lib\junit-4.13.1.jar;E:\mitDB\simple-db-hw-2021-master\lib\ant-contrib-1.0b3.jar;E:\mitDB\simple-db-hw-2021-master\out\production\simple-db-hw-2021-master1
+Launcher Type: SUN_STANDARD
+
+[Global flags]
+     intx CICompilerCount                          = 3                                         {product} {ergonomic}
+     uint ConcGCThreads                            = 1                                         {product} {ergonomic}
+     uint G1ConcRefinementThreads                  = 4                                         {product} {ergonomic}
+   size_t G1HeapRegionSize                         = 1048576                                   {product} {ergonomic}
+    uintx GCDrainStackTargetSize                   = 64                                        {product} {ergonomic}
+   size_t InitialHeapSize                          = 268435456                                 {product} {ergonomic}
+   size_t MarkStackSize                            = 4194304                                   {product} {ergonomic}
+   size_t MaxHeapSize                              = 4284481536                                {product} {ergonomic}
+   size_t MinHeapDeltaBytes                        = 1048576                                   {product} {ergonomic}
+   size_t MinHeapSize                              = 8388608                                   {product} {ergonomic}
+    uintx NonNMethodCodeHeapSize                   = 5832780                                {pd product} {ergonomic}
+    uintx NonProfiledCodeHeapSize                  = 122912730                              {pd product} {ergonomic}
+    uintx ProfiledCodeHeapSize                     = 122912730                              {pd product} {ergonomic}
+    uintx ReservedCodeCacheSize                    = 251658240                              {pd product} {ergonomic}
+     bool SegmentedCodeCache                       = true                                      {product} {ergonomic}
+   size_t SoftMaxHeapSize                          = 4284481536                             {manageable} {ergonomic}
+     bool UseCompressedClassPointers               = true                                 {lp64_product} {ergonomic}
+     bool UseCompressedOops                        = true                                 {lp64_product} {ergonomic}
+     bool UseG1GC                                  = true                                      {product} {ergonomic}
+     bool UseLargePagesIndividualAllocation        = false                                  {pd product} {ergonomic}
+
+Logging:
+Log output configuration:
+ #0: stdout all=warning uptime,level,tags
+ #1: stderr all=off uptime,level,tags
+
+Environment Variables:
+JAVA_HOME=C:\Program Files\Java\jdk-14.0.1
+CLASSPATH=C:\Program Files\Java\jdk-14.0.1\lib
+PATH=D:\bin\;E:\MiniConda;E:\MiniConda\Library\mingw-w64\bin;E:\MiniConda\Library\usr\bin;E:\MiniConda\Library\bin;E:\MiniConda\Scripts;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.1\libnvvp;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files\IDM Computer Solutions\UltraEdit;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\MacType;E:\MATLAB\runtime\win64;E:\MATLAB\bin;E:\runtime\win64;E:\bin;E:\polyspace\bin;E:\MATLAB\polyspace\bin;C:\Program Files\Java\jdk-14.0.1\bin;C:\Program Files\NVIDIA Corporation\NVIDIA NvDLISR;C:\Program Files\Common Files\Autodesk Shared\;C:\Program Files\NVIDIA Corporation\Nsight Compute 2020.2.0\;D:\QT\5.9\mingw53_32\bin;E:\QT\5.9\mingw53_32\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;%MAVEN_HOME%\bin;D:\SQL Server\temp\100\Tools\Binn\;D:\SQL Server\100\Tools\Binn\;D:\SQL Server\100\DTS\Binn\;D:\SQL Server\temp\100\Tools\Binn\VSShell\Common7\IDE\;D:\SQL Server\temp\100\DTS\Binn\;C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE\PrivateAssemblies\;C:\Program Files (x86)\Microsoft SQL Server\150\DTS\Binn\;C:\Program Files\Azure Data Studio\bin;F:\Sumo\bin\;F:\Sumo\tools\;D:\Golang\bin;E:\MiniConda\python.exe;E:\MiniConda\pkgs\python-3.8.5-h5fd99cc_1;C:\Users\asus\AppData\Local\Programs\Python\Python38\Scripts\;C:\Users\asus\AppData\Local\Programs\Python\Python38\;C:\Users\asus\AppData\Local\Microsoft\WindowsApps;E:\IntelliJ IDEA Community Edition 2020.1\bin;;D:\texlive\2020\bin\win32;E:\PyCharm 2021.1\bin;;E:\PyCharm Community Edition 2021.1\bin;;C:\Program Files\NVIDIA Corporation\NVSMI;E:\MySQL\mysql-8.0.24-winx64\bin;D:\Microsoft VS Code\bin;D:\Maven\apache-maven-3.8.3\bin;C:\Program Files\Java\jdk-14.0.1\bin;C:\Program Files\Azure Data Studio\bin;C:\Users
+USERNAME=OpenUser
+OS=Windows_NT
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 158 Stepping 9, GenuineIntel
+
+
+
+---------------  S Y S T E M  ---------------
+
+OS: Windows 10 , 64 bit Build 19041 (10.0.19041.1566)
+OS uptime: 1 days 8:47 hours
+
+CPU:total 4 (initial active 4) (4 cores per cpu, 1 threads per core) family 6 model 158 stepping 9, cmov, cx8, fxsr, mmx, sse, sse2, sse3, ssse3, sse4.1, sse4.2, popcnt, avx, avx2, aes, clmul, erms, 3dnowpref, lzcnt, tsc, tscinvbit, bmi1, bmi2, adx, fma
+
+Memory: 4k page, system-wide physical 16341M (3276M free)
+TotalPageFile size 16341M (AvailPageFile size 19M)
+current process WorkingSet (physical memory assigned to process): 11M, peak: 11M
+current process commit charge ("private bytes"): 52M, peak: 308M
+
+vm_info: OpenJDK 64-Bit Server VM (14.0.1+7) for windows-amd64 JRE (14.0.1+7), built on Mar  5 2020 10:30:04 by "mach5one" with MS VC++ 15.9 (VS2017)
+
+END.

@@ -313,6 +313,7 @@ public class TestUtil {
         final TransactionId tid;
         final PageId pid;
         final Permissions perm;
+
         boolean acquired;
         Exception error;
         final Object alock;

@@ -15,26 +15,27 @@ import simpledb.transaction.TransactionId;
 
 public class LockingTest extends TestUtil.CreateHeapFile {
   private PageId p0;
-    private PageId p1;
-    private TransactionId tid1, tid2;
+  private PageId p1;
+  private TransactionId tid1, tid2;
 
   /** Time to wait before checking the state of lock contention, in ms */
   private static final int TIMEOUT = 100;
 
-  // just so we have a pointer shorter than Database.getBufferPool()
+  // 这样我们的指针就比Database.getBufferPool()短
   private BufferPool bp;
 
   /**
    * Set up initial resources for each unit test.
    */
-  @Before public void setUp() throws Exception {
+  @Before
+  public void setUp() throws Exception {
     super.setUp();
 
-    // clear all state from the buffer pool
+    // 清除缓冲池的所有状态
     bp = Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
 
-    // create a new empty HeapFile and populate it with three pages.
-    // we should be able to add 504 tuples on an empty page.
+    // 创建一个新的空HeapFile，并用三个页面填充它。
+    // 我们应该能够在一个空页面上添加504个元组。
     TransactionId tid = new TransactionId();
     for (int i = 0; i < 1025; ++i) {
       empty.insertTuple(tid, Utility.getHeapTuple(i, 2));
@@ -45,16 +46,17 @@ public class LockingTest extends TestUtil.CreateHeapFile {
 
     this.p0 = new HeapPageId(empty.getId(), 0);
     this.p1 = new HeapPageId(empty.getId(), 1);
-      PageId p2 = new HeapPageId(empty.getId(), 2);
+    PageId p2 = new HeapPageId(empty.getId(), 2);
     this.tid1 = new TransactionId();
     this.tid2 = new TransactionId();
 
-    // forget about locks associated to tid, so they don't conflict with
+    // 忘记与tid关联的锁，这样它们就不会与之冲突
     // test cases
     bp.getPage(tid, p0, Permissions.READ_WRITE).markDirty(true, tid);
     bp.getPage(tid, p1, Permissions.READ_WRITE).markDirty(true, tid);
     bp.getPage(tid, p2, Permissions.READ_WRITE).markDirty(true, tid);
     bp.flushAllPages();
+    // 用于测试的方法——创建一个新的缓冲池实例并返回它
     bp = Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
   }
 
@@ -75,7 +77,9 @@ public class LockingTest extends TestUtil.CreateHeapFile {
       TransactionId tid2, PageId pid2, Permissions perm2,
       boolean expected) throws Exception {
 
+    // 在这里不应该发生阻塞
     bp.getPage(tid1, pid1, perm1);
+    // 应该在此处才发生竞争，而非上一行
     grabLock(tid2, pid2, perm2, expected);
   }
 
@@ -92,15 +96,15 @@ public class LockingTest extends TestUtil.CreateHeapFile {
   public void grabLock(TransactionId tid, PageId pid, Permissions perm,
       boolean expected) throws Exception {
 
-    TestUtil.LockGrabber t = new TestUtil.LockGrabber(tid, pid, perm);
-    t.start();
+      TestUtil.LockGrabber t = new TestUtil.LockGrabber(tid, pid, perm);
+      t.start();
 
-    // if we don't have the lock after TIMEOUT, we assume blocking.
-    Thread.sleep(TIMEOUT);
-    assertEquals(expected, t.acquired());
+      // if we don't have the lock after TIMEOUT, we assume blocking.
+      Thread.sleep(TIMEOUT);
+      assertEquals(expected, t.acquired());
 
-    // TODO(ghuo): yes, stop() is evil, but this is unit test cleanup
-    t.stop();
+      // TODO(ghuo): yes, stop() is evil, but this is unit test cleanup
+      t.stop();
   }
 
   /**
