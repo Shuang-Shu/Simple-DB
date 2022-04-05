@@ -126,8 +126,7 @@ you are using page-level locking, you will need to complete the following:
 
 *  Modify <tt>getPage()</tt> to block and acquire the desired lock
    before returning a page.
-*  Implement <tt>unsafeReleasePage()</tt>.  This method is primarily used
-   for testing, and at the end of transactions.
+*  Implement <tt>unsafeReleasePage()</tt>.  This method is primarily used for testing, and at the end of transactions.
 *  Implement <tt>holdsLock()</tt> so that logic in Exercise 2 can
    determine whether a page is already locked by a transaction.
 
@@ -135,8 +134,7 @@ You may find it helpful to define a <tt>LockManager</tt> class that is responsib
 maintaining state about transactions and locks, but the design decision is up to
 you.
 
-You may need to implement the next exercise before your code passes
-the unit tests in LockingTest.
+You may need to implement the next exercise before your code passes the unit tests in LockingTest.
 
 ***
 
@@ -160,8 +158,7 @@ before you read it, and you will need to acquire an *exclusive*
 lock on any page (or tuple) before you write it. You will notice that
 we are already passing around `Permissions` objects in the
 BufferPool; these objects indicate the type of lock that the caller
-would like to have on the object being accessed (we have given you the
-code for the `Permissions` class.)
+would like to have on the object being accessed (we have given you the code for the `Permissions` class.)
 
 Note that your implementation of `HeapFile.insertTuple()`
 and `HeapFile.deleteTuple()`, as well as the implementation
@@ -169,31 +166,26 @@ of the iterator returned by `HeapFile.iterator()` should
 access pages using `BufferPool.getPage()`. Double check
 that these different uses of `getPage()` pass the
 correct permissions object (e.g., `Permissions.READ_WRITE`
-or `Permissions.READ_ONLY`). You may also wish to double
-check that your implementation of
-`BufferPool.insertTuple()` and
-`BufferPool.deleteTupe()` call `markDirty()` on
-any of the pages they access (you should have done this when you
-implemented this code in lab 2, but we did not test for this case.)
+or `Permissions.READ_ONLY`). 
+
+
+
+You may also wish to double check that your implementation of
+`BufferPool.insertTuple()` and `BufferPool.deleteTupe()` call `markDirty()` on any of the pages they access (you should have done this when you implemented this code in lab 2, but we did not test for this case.)
 
 After you have acquired locks, you will need to think about when to
 release them as well. It is clear that you should release all locks
 associated with a transaction after it has committed or aborted to ensure strict 2PL.
-However, it is
-possible for there to be other scenarios in which releasing a lock before
-a transaction ends might be useful. For instance, you may release a shared lock
-on a page after scanning it to find empty slots (as described below).
+However, it is possible for there to be other scenarios in which releasing a lock before a transaction ends might be useful. For instance, you may release a shared lock on a page after scanning it to find empty slots (as described below).
 
 ***
 
 **Exercise 2.**
 
-Ensure that you acquire and release locks throughout SimpleDB. Some (but
-not necessarily all) actions that you should verify work properly:
+Ensure that you acquire and release locks throughout SimpleDB. Some (but not necessarily all) actions that you should verify work properly:
 
 *  Reading tuples off of pages during a SeqScan (if you
-   implemented locking  in `BufferPool.getPage()`, this should work
-   correctly as long as your `HeapFile.iterator()` uses
+   implemented locking  in `BufferPool.getPage()`, this should work correctly as long as your `HeapFile.iterator()` uses
    `BufferPool.getPage()`.)
 *  Inserting and deleting tuples through BufferPool and HeapFile
    methods (if you
@@ -206,9 +198,7 @@ You will also want to think especially hard about acquiring and releasing
 locks in the following situations:
 
 *  Adding a new page to a `HeapFile`.  When do you physically
-   write the page to disk?  Are there race conditions with other transactions
-   (on other threads) that might need special attention at the HeapFile level,
-   regardless of page-level locking?
+   write the page to disk?  Are there race conditions with other transactions (on other threads) that might need special attention at the HeapFile level, regardless of page-level locking?
 *  Looking for an empty slot into which you can insert tuples.
    Most implementations scan pages looking for an empty
    slot, and will need a READ_ONLY lock to do this.  Surprisingly, however,

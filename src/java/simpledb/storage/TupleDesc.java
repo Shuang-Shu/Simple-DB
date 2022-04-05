@@ -214,7 +214,7 @@ public class TupleDesc implements Serializable {
         if(this.numFields()!=temp.numFields())
             return false;
 
-        Iterator<TDItem> iterator1=temp.iterator();
+        Iterator<TDItem> iterator1=this.iterator();
         Iterator<TDItem> iterator2=temp.iterator();
 
         while (iterator1.hasNext()){

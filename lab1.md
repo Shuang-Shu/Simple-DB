@@ -379,7 +379,6 @@ file as you will need to access these objects.
 
 ***
 
-
 At this point, your code should pass the unit tests TupleTest and TupleDescTest. At this point, modifyRecordId() should
 fail because you havn't implemented it yet.
 
@@ -408,7 +407,6 @@ At this point, your code should pass the unit tests in CatalogTest.
 ### 2.4. BufferPool
 
 <p>The buffer pool (class `BufferPool` in SimpleDB) is responsible for caching pages in memory that have been recently read from disk. All operators read and write pages from various files on disk through the buffer pool. It consists of a fixed number of pages, defined by the `numPages` parameter to the `BufferPool` constructor. In later labs, you will implement an eviction policy. For this lab, you only need to implement the constructor and the `BufferPool.getPage()` method used by the SeqScan operator. The BufferPool should store up to `numPages` pages. For this lab, if more than `numPages` requests are made for different pages, then instead of implementing an eviction policy, you may throw a DbException. In future labs you will be required to implement an eviction policy.
-
 The `Database` class provides a static method, `Database.getBufferPool()`, that returns a reference to the single
 BufferPool instance for the entire SimpleDB process.
 
@@ -434,7 +432,6 @@ policy is up to you; it is not necessary to do something sophisticated.
 
 <!--
 <p>
-
 Notice that `BufferPool` asks you to implement
 a `flush_all_pages()` method.  This is not something you would ever
 need in a real implementation of a buffer pool.  However, we need this method
@@ -506,6 +503,7 @@ are [big-endian](http://en.wikipedia.org/wiki/Endianness).
 ### Exercise 4
 
 **Implement the skeleton methods in:**
+
 ***
 
 * src/java/simpledb/storage/HeapPageId.java
@@ -514,11 +512,8 @@ are [big-endian](http://en.wikipedia.org/wiki/Endianness).
 
 ***
 
-
 Although you will not use them directly in Lab 1, we ask you to implement <tt>getNumEmptySlots()</tt> and <tt>
-isSlotUsed()</tt> in HeapPage. These require pushing around bits in the page header. You may find it helpful to look at
-the other methods that have been provided in HeapPage or in <tt>src/simpledb/HeapFileEncoder.java</tt> to understand the
-layout of pages.
+isSlotUsed()</tt> in HeapPage. These require pushing around bits in the page header. You may find it helpful to look at the other methods that have been provided in HeapPage or in <tt>src/simpledb/HeapFileEncoder.java</tt> to understand the layout of pages.
 
 You will also need to implement an Iterator over the tuples in the page, which may involve an auxiliary class or data
 structure.
@@ -527,9 +522,7 @@ At this point, your code should pass the unit tests in HeapPageIdTest, RecordIDT
 
 
 <p> 
-
-After you have implemented <tt>HeapPage</tt>, you will write methods for <tt>HeapFile</tt> in this lab to calculate the
-number of pages in a file and to read a page from the file. You will then be able to fetch tuples from a file stored on
+After you have implemented <tt>HeapPage</tt>, you will write methods for <tt>HeapFile</tt> in this lab to calculate the number of pages in a file and to read a page from the file. You will then be able to fetch tuples from a file stored on
 disk.
 
 ### Exercise 5
@@ -542,16 +535,16 @@ disk.
 
 ***
 
-To read a page from disk, you will first need to calculate the correct offset in the file. Hint: you will need random
-access to the file in order to read and write pages at arbitrary offsets. You should not call BufferPool methods when
-reading a page from disk.
+To read a page from disk, you will first need to calculate the correct offset in the file. Hint: you will need **random access to the file** in order to read and write pages at arbitrary offsets. You should not call BufferPool methods when
+reading a page from disk
 
 <p> 
-You will also need to implement the `HeapFile.iterator()` method, which should iterate through through the tuples of each page in the HeapFile. The iterator must use the `BufferPool.getPage()` method to access pages in the `HeapFile`. This method loads the page into the buffer pool and will eventually be used (in a later lab) to implement locking-based concurrency control and recovery.  Do not load the entire table into memory on the open() call -- this will cause an out of memory error for very large tables.
+You will also need to implement the `HeapFile.iterator()` method, which should iterate through the tuples of each page in the HeapFile. The iterator must use the `BufferPool.getPage()` method to access pages in the `HeapFile`. This method loads the page into the buffer pool and will eventually be used (in a later lab) to implement locking-based concurrency control and recovery.  Do not load the entire table into memory on the open() call -- this will cause an out of memory error for very large tables.
+
 
 <p>
 
-At this point, your code should pass the unit tests in HeapFileReadTest.
+At this point, your code should pass the unit tests in **HeapFileReadTest**.
 
 ### 2.6. Operators
 

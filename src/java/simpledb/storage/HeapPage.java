@@ -285,7 +285,7 @@ public class HeapPage implements Page {
         // not necessary for lab
         // 注意，tuple本身的recodrId已经标识了它的位置
         int i=t.getRecordId().getTupleNumber();
-        if(this.isSlotUsed(i)) {
+        if(this.isSlotUsed(i)&&this.pid==t.getRecordId().getPageId()) {
             this.tuples[i]=null;
             int base = i / 8;
             byte b = this.header[base];

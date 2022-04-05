@@ -8,6 +8,7 @@ import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
+import java.awt.image.DataBuffer;
 import java.io.*;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
@@ -40,7 +41,7 @@ public class HeapFile implements DbFile {
         public HeapFileIterator(){
             try {
                 HeapPageId pid=new HeapPageId(getId(), this.pageNo);
-                this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, null);
+                this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_WRITE);
                 this.totalPageNumber=(int)(heapFile.length()/Database.getBufferPool().getPageSize());
                 this.iterator=this.page.iterator();
                 // 事务的ID
@@ -166,9 +167,12 @@ public class HeapFile implements DbFile {
     }
 
     // see DbFile.java for javadocs
-    public Page readPage(PageId pid) {
+    public Page readPage(PageId pid) throws IllegalArgumentException{
         // some code goes here
         long offset=pid.getPageNumber()*Database.getBufferPool().getPageSize();
+        int num=this.numPages();
+        if(pid.getPageNumber()>=num)
+            throw new IllegalArgumentException();
         byte[] buffer=new byte[Database.getBufferPool().getPageSize()];
         HeapPage result=null;
         File file=this.heapFile;
@@ -209,30 +213,49 @@ public class HeapFile implements DbFile {
     }
 
     // see DbFile.java for javadocs
+    // 代表事务将指定的元组插入文件。此方法将在受影响的文件页面上获得一个锁，并可能阻塞，直到获得锁为止。
+    // 返回被影响的Page的List
+    // 该方法只会在
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
-        List<Page> list=new ArrayList<>();
-        int numPages=this.numPages();
-        HeapPage heapPage;
-        for(int i=0;i<numPages;++i){
-            HeapPageId heapPageId=new HeapPageId(getId(), i);
-            heapPage=((HeapPage)Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE));
-            if(heapPage.getNumEmptySlots()>0){
+        List<Page> list = new ArrayList<>();
+        int numPages = this.numPages();
+        HeapPage heapPage=null;
+        for (int i = 0; i < numPages; ++i) {
+            // 这里保证了一定找到一个存在的page
+            HeapPageId heapPageId = new HeapPageId(getId(), i);
+            // getPage方法需要获取锁
+            // 注意，此处的page是磁盘中page在BufferPool中的镜像
+            heapPage = ((HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE));
+            if (heapPage.getNumEmptySlots() > 0) {
                 heapPage.insertTuple(t);
-                list.add(heapPage);
-                return list;
+            }else{
+                // 若该page中没有空的槽位，直接释放这个page上的锁
+                // 此时放弃锁并不满足2PL原则，但此时释放锁不会影响结果，同时还能够提高并发度
+                Database.getBufferPool().unsafeReleasePage(tid, heapPageId);
             }
         }
-        //若均空，则新建page
-        HeapPageId heapPageId=new HeapPageId(getId(), this.numPages());
-        heapPage=new HeapPage(heapPageId, HeapPage.createEmptyPageData());
-        heapPage.insertTuple(t);
-        RandomAccessFile raf=new RandomAccessFile(this.heapFile, "rw");
-        raf.seek(this.numPages()*Database.getBufferPool().getPageSize());
-        raf.write(heapPage.getPageData());
-        raf.close();
+        // 若均空，则需要新建page，这里新建的page应该在bufferpool中新建，而非直接在HeapFile的物理存储中新建
+
+        // 此时需要考虑并发问题，因为可能有其它的事务也在新建page，
+        if(list.size()==BufferPool.DEFAULT_PAGES){
+            // 此时需要在BufferPool中新建一个page，并用于tuple的插入
+            synchronized (Database.getBufferPool()){
+                // 锁定BufferPool，防止被修改
+                // 检查别的事务是否已经新建了该page
+                HeapPageId heapPageId = new HeapPageId(getId(), numPages);
+                if(Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE)==null){
+                    // 其它事务尚未新建Page
+                    heapPage=new HeapPage(heapPageId, HeapPage.createEmptyPageData());
+                    // 将tuple插入heapPage
+                    heapPage.insertTuple(t);
+                }else{
+                    this.insertTuple(tid, t);
+                }
+            }
+        }
         list.add(heapPage);
         return list;
     }

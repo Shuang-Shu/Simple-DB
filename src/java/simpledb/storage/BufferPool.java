@@ -48,6 +48,7 @@ class LockManager{
     Map<PageId, Condition> conditionMap;
     // 存放了transactionId所涉及的pageId，这和locks记录的关系是相反的，它是为了加快运行速度
     Map<TransactionId, Set<PageId>> transactionPageMap;
+    // 用于对LockManager加锁
     Lock managerLock;
 
     // 构造函数
@@ -75,6 +76,7 @@ class LockManager{
 
     // 尝试获取锁，若成功则返回；否则阻塞
     public void requestLock(TransactionId transactionId, PageId pageId, Permissions permissions){
+        managerLock.lock();
         managerLock.lock();
         try {
             if (!locks.containsKey(pageId)) {
@@ -222,6 +224,8 @@ public class BufferPool {
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
     private static LockManager lockManager=new LockManager();
+    // 这个锁用于保证只有一个事务能够新建进程
+    Lock newPageLock=new ReentrantLock();
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -269,30 +273,36 @@ public class BufferPool {
             //若bufferPool未满
         try {
             // 要考虑读取的权限问题
-            //在bufferPool中查找对应的pid
+            // 在bufferPool中查找对应的pid
+            // 请求加锁
             lockManager.requestLock(tid, pid, perm);
             Iterator<Page> iterator=this.bufferPool.iterator();
             while(iterator.hasNext()){
+                // 检查当前bufferpool中是否有所需的page
                 Page temp=iterator.next();
                 if(temp!=null&&temp.getId().equals(pid))
                     return temp;
             }
             if (this.bufferPool.size() < this.DEFAULT_PAGES) {
-                //catalog单例中记录了数据库的全部信息，通过pid可以获取表的信息
+                // catalog单例中记录了数据库的全部信息，通过pid可以获取表的信息
+                // 若bufferpool有剩余，则直接在bufferpool中创建一个page镜像
                 try {
                     Page temp = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
                     this.bufferPool.add(temp);
                     return temp;
-                } catch (NoSuchElementException e) {
+                } catch (IllegalArgumentException e) {
+                    // 此时磁盘文件中无此page
                     return null;
                 }
             } else {
                 //若bufferPool已满，目前先抛出DbException
+                // 已添加页面置换，简单地替换掉第一个页面
                 this.evictPage();
                 return this.getPage(tid, pid, perm);
             }
         }finally {
-            lockManager.releaseLock(tid, pid);
+            // 不应该在某个操作中释放锁，锁的释放应由事务控制
+            // lockManager.releaseLock(tid, pid);
         }
     }
 
@@ -319,9 +329,9 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
-        Set<PageId> set=lockManager.transactionPageMap.get(tid);
-        for(PageId pageId:set)
-            lockManager.releaseLock(tid, pageId);
+//        Set<PageId> set=lockManager.transactionPageMap.get(tid);
+//        for(PageId pageId:set)
+//            lockManager.releaseLock(tid, pageId);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
@@ -356,17 +366,21 @@ public class BufferPool {
      * been dirtied to the cache (replacing any existing versions of those pages) so 
      * that future requests see up-to-date pages. 
      *
+     * 代表事务tid向指定的表添加一个元组。将在元组被添加到的页面和任何其他被更新的页面上获取写锁(lab2不需要获取锁)。如果无法获得锁，可能会阻塞。通过调用这些页面的markDirty位，将所有被该操作弄脏的页面标记为dirty，并将所有被弄脏的页面的版本添加到缓存中(替换那些页面的任何现有版本)，以便将来的请求看到最新的页面。
+     *
      * @param tid the transaction adding the tuple
      * @param tableId the table to add the tuple to
      * @param t the tuple to add
      */
+    // 注意，该方法应该在BufferPool中操作，而非直接在文件层面操作
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
         DbFile dbFile=Database.getCatalog().getDatabaseFile(tableId);
-        List<Page> list=new ArrayList<>();
-        list=dbFile.insertTuple(tid, t);
+        List<Page> list=dbFile.insertTuple(tid, t);
+        // 这里的处理耦合了HeapFile，若使用其他类型的DbFile可能会出错
+        int pageNum=((HeapFile)dbFile).numPages();
         for(Page page:list) {
             page.markDirty(true, tid);
         }
@@ -404,8 +418,9 @@ public class BufferPool {
 
     /**
      * 将所有脏页刷新到磁盘。
-     * NB: Be careful using this routine -- it writes dirty data to disk so will
-     *     break simpledb if running in NO STEAL mode.
+     * NB: Be careful using this routine -- it writes dirty data to disk so will break simpledb if running in NO STEAL mode.
+     *
+     *
      */
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
@@ -426,6 +441,7 @@ public class BufferPool {
     */
     public synchronized void discardPage(PageId pid) {
         // some code goes here
+        // 这个操作只能在bufferpool已满的情况下进行，因为它调换的是最后一个slot中的page与pid对应的page
         // not necessary for lab1
         int idx=-1;
         for(int i=0;i<this.bufferPool.size();++i){
@@ -470,6 +486,8 @@ public class BufferPool {
     /**
      * Discards a page from the buffer pool.
      * Flushes the page to disk to ensure dirty pages are updated on disk.
+     * 从缓冲池中丢弃一个页面。将该页刷新到磁盘，以确保更新磁盘上的脏页
+     * 此时写入磁盘的数据会覆盖满足一致性的数据，此时原始数据应该被记录，以防止事务被中断
      */
     private synchronized  void evictPage() throws DbException {
         // some code goes here
