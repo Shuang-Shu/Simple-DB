@@ -7,6 +7,7 @@ import simpledb.transaction.TransactionId;
 import simpledb.common.Type;
 import simpledb.common.DbException;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -127,7 +128,7 @@ public class SeqScan implements OpIterator {
     }
 
     public Tuple next() throws NoSuchElementException,
-            TransactionAbortedException, DbException {
+            TransactionAbortedException, DbException{
         // some code goes here
         return iterator.next();
     }

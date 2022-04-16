@@ -4,6 +4,7 @@ import simpledb.common.DbException;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 

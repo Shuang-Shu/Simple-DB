@@ -129,6 +129,7 @@ public class BufferPoolWriteTest extends TestUtil.CreateHeapFile {
     	Database.getBufferPool().insertTuple(tid, hfd.getId(), Utility.getHeapTuple(1, 2));
     	
     	// there should now be 10 tuples (on 10 different pages) in the buffer pool
+		// 现在缓冲池中应该有10个元组(在10个不同的页面上)
     	DbFileIterator it = hfd.iterator(tid);
     	it.open();
     	

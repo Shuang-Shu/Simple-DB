@@ -77,7 +77,6 @@ class LockManager{
     // 尝试获取锁，若成功则返回；否则阻塞
     public void requestLock(TransactionId transactionId, PageId pageId, Permissions permissions){
         managerLock.lock();
-        managerLock.lock();
         try {
             if (!locks.containsKey(pageId)) {
                 // 该page的锁未被获取，设置其被获取，同时新增一个等待条件（起到了事务请求队列的作用）
@@ -223,7 +222,7 @@ public class BufferPool {
     other classes. BufferPool should use the numPages argument to the
     constructor instead. */
     public static final int DEFAULT_PAGES = 50;
-    private static LockManager lockManager=new LockManager();
+    private LockManager lockManager=new LockManager();
     // 这个锁用于保证只有一个事务能够新建进程
     Lock newPageLock=new ReentrantLock();
 
@@ -267,7 +266,7 @@ public class BufferPool {
      * @param perm the requested permissions on the page
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
-        throws TransactionAbortedException, DbException {
+            throws DbException {
         // some code goes here
         //若未在bufferPool中找到对应的pid
             //若bufferPool未满
@@ -292,7 +291,20 @@ public class BufferPool {
                     return temp;
                 } catch (IllegalArgumentException e) {
                     // 此时磁盘文件中无此page
-                    return null;
+                    // 此时应该直接在BufferPool中新建一个Page
+                    // 注意！这里与HeapPage类型的文件耦合
+                    // 需要获取一个空内容的HeapPage
+                    int len=BufferPool.getPageSize();
+                    byte[] blankData=new byte[len];
+                    Page temp= null;
+                    try {
+                        temp = new HeapPage((HeapPageId) pid, blankData);
+                        this.bufferPool.add(temp);
+                        this.flushPage(pid);
+                    } catch (IOException ioException) {
+                        ioException.printStackTrace();
+                    }
+                    return temp;
                 }
             } else {
                 //若bufferPool已满，目前先抛出DbException
@@ -372,7 +384,7 @@ public class BufferPool {
      * @param tableId the table to add the tuple to
      * @param t the tuple to add
      */
-    // 注意，该方法应该在BufferPool中操作，而非直接在文件层面操作
+    // 注意，此处需要将所有被污染的Page插入BufferPool
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
@@ -380,9 +392,20 @@ public class BufferPool {
         DbFile dbFile=Database.getCatalog().getDatabaseFile(tableId);
         List<Page> list=dbFile.insertTuple(tid, t);
         // 这里的处理耦合了HeapFile，若使用其他类型的DbFile可能会出错
-        int pageNum=((HeapFile)dbFile).numPages();
+//        int pageNum=((HeapFile)dbFile).numPages();
+        boolean contains;
         for(Page page:list) {
             page.markDirty(true, tid);
+            // 将DirtyPage写入BufferPool
+            contains=false;
+            for(Page cachedPage:bufferPool){
+                if(cachedPage.getId()==page.getId()){
+                    cachedPage=page;
+                    contains=true;
+                }
+            }
+            if(contains==false)
+                bufferPool.add(page);
         }
     }
 
@@ -403,6 +426,7 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        //
         try {
             DbFile dbFile = Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
             List<Page> list;
@@ -489,7 +513,7 @@ public class BufferPool {
      * 从缓冲池中丢弃一个页面。将该页刷新到磁盘，以确保更新磁盘上的脏页
      * 此时写入磁盘的数据会覆盖满足一致性的数据，此时原始数据应该被记录，以防止事务被中断
      */
-    private synchronized  void evictPage() throws DbException {
+    private synchronized  void evictPage() {
         // some code goes here
         // not necessary for lab1
         //仅仅简单的替换掉第一个page

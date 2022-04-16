@@ -324,8 +324,8 @@ public class HeapPage implements Page {
     }
 
     /**
-     * Marks this page as dirty/not dirty and record that transaction
-     * that did the dirtying
+     * Marks this page as dirty/not dirty and record that transaction that did the dirtying
+     *将 此页面标记为脏/不脏，并记录进行脏操作的事务
      */
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here

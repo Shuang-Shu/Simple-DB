@@ -56,7 +56,7 @@ public class HeapFile implements DbFile {
         }
 
         @Override
-        public boolean hasNext() throws DbException, TransactionAbortedException {
+        public boolean hasNext() throws DbException {
             if(isOpen==true) {
                 if (iterator.hasNext() == true)
                     return true;
@@ -206,7 +206,8 @@ public class HeapFile implements DbFile {
      */
     public int numPages() {
         // some code goes here
-        //使用file.length()获取file的长度
+        // 使用file.length()获取file的长度
+        // 除已在硬盘中的文件外，还需要考虑BufferPool中可能存在的新建的页面，它们在程序正常运行的情况下将在未来被写入磁盘
         //
         long fileLength=this.heapFile.length();
         return (int)(fileLength/Database.getBufferPool().getPageSize());
@@ -217,7 +218,7 @@ public class HeapFile implements DbFile {
     // 返回被影响的Page的List
     // 该方法只会在
     public List<Page> insertTuple(TransactionId tid, Tuple t)
-            throws DbException, IOException, TransactionAbortedException {
+            throws DbException, TransactionAbortedException, IOException {
         // some code goes here
         // not necessary for lab1
         List<Page> list = new ArrayList<>();
@@ -227,10 +228,12 @@ public class HeapFile implements DbFile {
             // 这里保证了一定找到一个存在的page
             HeapPageId heapPageId = new HeapPageId(getId(), i);
             // getPage方法需要获取锁
-            // 注意，此处的page是磁盘中page在BufferPool中的镜像
+            // 注意，此处的page是磁盘中page在BufferPool中的镜像，而非磁盘中的对象
             heapPage = ((HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE));
             if (heapPage.getNumEmptySlots() > 0) {
                 heapPage.insertTuple(t);
+                list.add(heapPage);
+                return list;
             }else{
                 // 若该page中没有空的槽位，直接释放这个page上的锁
                 // 此时放弃锁并不满足2PL原则，但此时释放锁不会影响结果，同时还能够提高并发度
@@ -238,22 +241,37 @@ public class HeapFile implements DbFile {
             }
         }
         // 若均空，则需要新建page，这里新建的page应该在bufferpool中新建，而非直接在HeapFile的物理存储中新建
-
-        // 此时需要考虑并发问题，因为可能有其它的事务也在新建page，
-        if(list.size()==BufferPool.DEFAULT_PAGES){
-            // 此时需要在BufferPool中新建一个page，并用于tuple的插入
+        // 这里新建Page的工作在BufferPool.getPage()的catch块中完成
+        // 此时需要考虑并发问题，因为可能有其它的事务也在新建page（后续Lab的内容）
+        /*
+        *   并发的可能性：
+        *       1. 没有其它事务（线程）新建Page，此时本线程能通过BufferPool直接新建Page并插入tuple
+        *       2. 有其它线程新建Page，但Page未满，此时本线程获取的是其它线程修改完成的Page，直接插入
+        *       3. 有其它线程新建Page，且Page已满，
+        *
+        * */
+        if(list.size()==0){
             synchronized (Database.getBufferPool()){
                 // 锁定BufferPool，防止被修改
                 // 检查别的事务是否已经新建了该page
                 HeapPageId heapPageId = new HeapPageId(getId(), numPages);
-                if(Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE)==null){
-                    // 其它事务尚未新建Page
-                    heapPage=new HeapPage(heapPageId, HeapPage.createEmptyPageData());
-                    // 将tuple插入heapPage
-                    heapPage.insertTuple(t);
-                }else{
-                    this.insertTuple(tid, t);
-                }
+                HeapPage newPage= (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE);
+                newPage.insertTuple(t);
+                list.add(newPage);
+                return list;
+//                if(Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE)==null){
+//                    // 这个条件目前不可能达成，因为getPage必定会返回一个结果
+//                    // 其它事务尚未新建Page
+//                    try {
+//                        heapPage=new HeapPage(heapPageId, HeapPage.createEmptyPageData());
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+//                    // 将tuple插入heapPage
+//                    heapPage.insertTuple(t);
+//                }else{
+//                    this.insertTuple(tid, t);
+//                }
             }
         }
         list.add(heapPage);
@@ -261,8 +279,7 @@ public class HeapFile implements DbFile {
     }
 
     // see DbFile.java for javadocs
-    public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
-            TransactionAbortedException {
+    public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
         ArrayList<Page> list=new ArrayList<>();
