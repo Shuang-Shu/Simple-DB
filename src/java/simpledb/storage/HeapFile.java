@@ -38,14 +38,14 @@ public class HeapFile implements DbFile {
         private boolean isOpen=false;
         private TransactionId transactionId;
 
-        public HeapFileIterator(){
+        public HeapFileIterator(TransactionId tid){
             try {
+                // 事务的ID
+                this.transactionId=tid;
                 HeapPageId pid=new HeapPageId(getId(), this.pageNo);
                 this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_WRITE);
                 this.totalPageNumber=(int)(heapFile.length()/Database.getBufferPool().getPageSize());
                 this.iterator=this.page.iterator();
-                // 事务的ID
-                transactionId=new TransactionId();
             }catch (Exception e){
                 e.printStackTrace();
             }
@@ -292,7 +292,7 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
-        return new HeapFileIterator();
+        return new HeapFileIterator(tid);
     }
 
     private File heapFile;

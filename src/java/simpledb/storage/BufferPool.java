@@ -341,9 +341,12 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
-//        Set<PageId> set=lockManager.transactionPageMap.get(tid);
-//        for(PageId pageId:set)
-//            lockManager.releaseLock(tid, pageId);
+        Set<PageId> set=lockManager.transactionPageMap.get(tid);
+        Set<PageId> clonedSet=new HashSet<>();
+        for(PageId pageId:set)
+            clonedSet.add(pageId);
+        for(PageId pageId:clonedSet)
+            lockManager.releaseLock(tid, pageId);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */

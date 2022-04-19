@@ -8,7 +8,7 @@ import java.nio.channels.FileLockInterruptionException;
 
 /**
  * Predicate compares tuples to a specified Field value.
- * 谓词将图元与一个指定的字段值进行比较。
+ * 谓词将tuples与一个指定的字段值进行比较。
  * Predicate对象用于filter运算符
  */
 public class Predicate implements Serializable {
