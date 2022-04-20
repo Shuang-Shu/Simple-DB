@@ -221,12 +221,9 @@ pages and rereading them from disk. Thus, we must not evict dirty
 pages. This policy is called NO STEAL.
 
 You will need to modify the <tt>evictPage</tt> method in <tt>BufferPool</tt>.
-In particular, it must never evict a dirty page. If your eviction policy prefers a dirty page
-for eviction, you will have to find a way to evict an alternative
-page. In the case where all pages in the buffer pool are dirty, you
+In particular, it must never evict a dirty page. If your eviction policy prefers a dirty page for eviction, you will have to find a way to evict an alternative page. In the case where all pages in the buffer pool are dirty, you
 should throw a <tt>DbException</tt>. If your eviction policy evicts a clean page, be
-mindful of any locks transactions may already hold to the evicted page and handle them 
-appropriately in your implementation.
+mindful of any locks transactions may already hold to the evicted page and handle them  appropriately in your implementation.
 
 ***
 
@@ -276,7 +273,7 @@ Whether the transaction commits or aborts, you should also release any state the
 the transaction, including releasing any locks that the transaction held.
 
 At this point, your code should pass the `TransactionTest` unit test and the
-`AbortEvictionTest` system test.  You may find the `TransactionTest` system test
+`AbortEvictionTest` system test.  You may find the `AbortEvictionTest` system test
 illustrative, but it will likely fail until you complete the next exercise.
 
 ###  2.8. Deadlocks and Aborts
@@ -288,52 +285,34 @@ You will need to detect this situation and throw a
 
 There are many possible ways to detect deadlock. A strawman example would be to
 implement a simple timeout policy that aborts a transaction if it has not
-completed after a given period of time. For a real solution, you may implement
-cycle-detection in a dependency graph data structure as shown in lecture. In this
-scheme, you would  check for cycles in a dependency graph periodically or whenever
-you attempt to grant a new lock, and abort something if a cycle exists. After you have detected
-that a deadlock exists, you must decide how to improve the situation. Assume you
-have detected a deadlock while  transaction *t* is waiting for a lock.  If you're
-feeling  homicidal, you might abort **all** transactions that *t* is
-waiting for; this may result in a large amount of work being undone, but
-you can guarantee that *t* will make progress.
-Alternately, you may decide to abort *t* to give other
-transactions a chance to make progress. This means that the end-user will have
-to retry transaction *t*.
+completed after a given period of time. 
+
+For a real solution, you may implement cycle-detection in a dependency graph data structure as shown in lecture. In this scheme, you would  check for cycles in a dependency graph periodically or whenever you attempt to grant a new lock, and abort something if a cycle exists. 
+
+After you have detected that a deadlock exists, you must decide how to improve the situation. Assume you have detected a deadlock while  transaction *t* is waiting for a lock.  If you're feeling  homicidal, you might abort **all** transactions that *t* is waiting for; this may result in a large amount of work being undone, but you can guarantee that *t* will make progress.
+Alternately, you may decide to abort *t* to give other transactions a chance to make progress. This means that the end-user will have to retry transaction *t*.
 
 Another approach is to use global orderings of transactions to avoid building the 
 wait-for graph. This is sometimes preferred for performance reasons, but transactions
-that could have succeeded can be aborted by mistake under this scheme. Examples include
-the WAIT-DIE and WOUND-WAIT schemes.
+that could have succeeded can be aborted by mistake under this scheme. Examples include the WAIT-DIE and WOUND-WAIT schemes.
 
 ***
 
 **Exercise 5.**
 
-Implement deadlock detection or prevention in `src/simpledb/BufferPool.java`. You have many
-design decisions for your deadlock handling system, but it is not necessary to
-do something highly sophisticated. We expect you to do better than a simple timeout on each
-transaction. A good starting point will be to implement cycle-detection in a wait-for graph
+Implement deadlock detection or prevention in `src/simpledb/BufferPool.java`. You have many design decisions for your deadlock handling system, but it is not necessary to do something highly sophisticated. We expect you to do better than a simple timeout on each transaction.
+
+ A good starting point will be to implement cycle-detection in a wait-for graph
 before every lock request, and you will receive full credit for such an implementation.
 Please describe your choices in the lab writeup and list the pros and cons of your choice
 compared to the alternatives.
 
-You should ensure that your code aborts transactions properly when a
-deadlock occurs, by throwing a
-`TransactionAbortedException` exception.
-This exception will be caught by the code executing the transaction
-(e.g., `TransactionTest.java`), which should call
+You should ensure that your code aborts transactions properly when a deadlock occurs, by throwing a `TransactionAbortedException` exception. This exception will be caught by the code executing the transaction (e.g., `TransactionTest.java`), which should call
 `transactionComplete()` to cleanup after the transaction.
-You are not expected to automatically restart a transaction which
-fails due to a deadlock -- you can assume that higher level code
-will take care of this.
+You are not expected to automatically restart a transaction which fails due to a deadlock -- you can assume that higher level code will take care of this.
 
-We have provided some (not-so-unit) tests in
-`test/simpledb/DeadlockTest.java`. They are actually a
-bit involved, so they may take more than a few seconds to run (depending
-on your policy). If they seem to hang indefinitely, then you probably
-have an unresolved deadlock. These tests construct simple deadlock
-situations that your code should be able to escape.
+We have provided some (not-so-unit) tests in `test/simpledb/DeadlockTest.java`. They are actually a bit involved, so they may take more than a few seconds to run (depending
+on your policy). If they seem to hang indefinitely, then you probably have an unresolved deadlock. These tests construct simple deadlock situations that your code should be able to escape.
 
 Note that there are two timing parameters near the top of
 `DeadLockTest.java`; these determine the frequency at which

@@ -341,12 +341,11 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
-        Set<PageId> set=lockManager.transactionPageMap.get(tid);
-        Set<PageId> clonedSet=new HashSet<>();
-        for(PageId pageId:set)
-            clonedSet.add(pageId);
-        for(PageId pageId:clonedSet)
-            lockManager.releaseLock(tid, pageId);
+        try {
+            transactionComplete(tid, true);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
@@ -368,6 +367,39 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
+        if(commit){
+            // 成功commit的情况
+            // 持久化BufferPool中所有与tid相关的page
+            for(int i=0;i<bufferPool.size();++i){
+                TransactionId temp=bufferPool.get(i).isDirty();
+                if(temp==tid){
+                    // 该page应该被持久化
+                    try {
+                        flushPage(bufferPool.get(i).getId());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }else {
+            // 事务异常终止的情况
+            for(int i=0;i<bufferPool.size();++i){
+                TransactionId temp=bufferPool.get(i).isDirty();
+                if(temp==tid){
+                    // 该page应该被恢复为磁盘中的状态
+                    int tableId=bufferPool.get(i).getId().getTableId();
+                    PageId pid=bufferPool.get(i).getId();
+                    bufferPool.set(i, Database.getCatalog().getDatabaseFile(tableId).readPage(pid));
+                }
+            }
+        }
+        // 释放所有与该tid相关的锁
+        Set<PageId> set=lockManager.transactionPageMap.get(tid);
+        Set<PageId> clonedSet=new HashSet<>();
+        for(PageId pageId:set)
+            clonedSet.add(pageId);
+        for(PageId pageId:clonedSet)
+            lockManager.releaseLock(tid, pageId);
     }
 
     /**
@@ -519,11 +551,25 @@ public class BufferPool {
     private synchronized  void evictPage() {
         // some code goes here
         // not necessary for lab1
-        //仅仅简单的替换掉第一个page
+        // 仅仅简单的替换掉第一个page
+        // Lab4中需要修改该方法，保证不置换一个DirtyPage
+        // 通过简单的遍历实现
         try {
-            this.flushPage(this.bufferPool.get(0).getId());
-            this.discardPage(this.bufferPool.get(0).getId());
-        }catch (Exception e){
+            int index=-1;
+            for(int i=0;i<bufferPool.size();++i){
+                if(bufferPool.get(i).isDirty()==null){
+                    index=i;
+                    break;
+                }
+            }
+            if(index!=-1){
+                this.flushPage(this.bufferPool.get(index).getId());
+                this.discardPage(this.bufferPool.get(index).getId());
+            }else
+                throw new DbException("BufferPool中全为脏页，无法置换");
+        }catch (IOException e){
+            e.printStackTrace();
+        }catch (DbException e){
             e.printStackTrace();
         }
     }

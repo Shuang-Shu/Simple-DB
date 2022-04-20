@@ -175,7 +175,6 @@ public class HeapFile implements DbFile {
             throw new IllegalArgumentException();
         byte[] buffer=new byte[Database.getBufferPool().getPageSize()];
         HeapPage result=null;
-        File file=this.heapFile;
         try {
             RandomAccessFile raf=new RandomAccessFile(this.heapFile, "r");
             raf.seek(offset);
