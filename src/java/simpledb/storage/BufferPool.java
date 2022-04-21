@@ -40,6 +40,239 @@ class Pair<T1, T2>{
     }
 }
 
+// 一个集合邻接表实现的图对象
+/*
+@Date      :
+---------
+    2022/04/21 11:00:58
+Description:
+---------
+    邻接表的图实现，支持有向/无向图
+    实现中列表被Map代替以提高效率
+*/
+class AdjacencyListGraph<T, V> {
+    Map<T, Set<EdgeNode<T, V>>> vertexMap=new HashMap<>();
+    /*
+    @Description  :
+    ---------
+        向图中插入一条边，如已有边<start, end>，则覆盖其value
+    @Param        :
+    ---------
+        T start
+            起点的id
+        T end
+            终点的id
+    @Returns      :
+    ---------
+        void
+    */
+    public void insertEdge(T start, T end, V value){
+        EdgeNode<T, V> newEdge=new EdgeNode<>(end, value);
+        if(!vertexMap.containsKey(start)){
+            Set<EdgeNode<T, V> > newSet=new HashSet<>();
+            newSet.add(newEdge);
+            vertexMap.put(start, newSet);
+        }else{
+            Set<EdgeNode<T, V> > oldSet=vertexMap.get(start);
+            if(!oldSet.contains(newEdge)){
+                // 不包含该边，加入
+            }else{
+                // 包含该边，修改值
+                oldSet.remove(newEdge);
+            }
+            oldSet.add(newEdge);
+        }
+    }
+    /*
+    @Description  :
+    ---------
+        判断图中是否有某条边
+    @Param        :
+    ---------
+
+    @Returns      :
+    ---------
+        true
+            含有
+        false
+            不含有
+    */
+    public boolean containsEdge(T start, T end){
+        EdgeNode<T, V> edge=new EdgeNode<>(end, null);
+        if(!vertexMap.containsKey(start))
+            return false;
+        else{
+            if(!vertexMap.get(start).contains(edge))
+                return false;
+        }
+        return true;
+    }
+
+    /*
+    @Description  :
+    ---------
+        删除图中的边
+    @Param        :
+    ---------
+
+    @Returns      :
+    ---------
+        true
+            删除成功
+        false
+            删除失败
+    */
+    public boolean removeEdge(T start, T end){
+        if(!vertexMap.containsKey(start)){
+            return false;
+        }else{
+            Set<EdgeNode<T, V>> temp=vertexMap.get(start);
+            EdgeNode<T, V> targetEdge=new EdgeNode<>(end, null);
+            if(!temp.contains(targetEdge))
+                return false;
+            else{
+                temp.remove(targetEdge);
+                if(temp.isEmpty())
+                    vertexMap.remove(start);
+            }
+        }
+        return true;
+    }
+
+    /*
+    @Description  :
+    ---------
+        基于DFS的环检测算法，检测是否有经过originStart的环
+    @Param        :
+    ---------
+        T originStart
+            环探测的开始位置
+        T start
+            DFS的开始位置
+        Set<T> path
+            记录已遍历的节点，由调用者提供
+    @Returns      :
+    ---------
+        true
+            存在环
+        false
+            不存在环
+    */
+    public boolean circleDetect(T originStart, T start, Set<T> path){
+        Set<EdgeNode<T, V>> next=vertexMap.get(start);
+        if(next!=null){
+            for(EdgeNode<T, V> edge: next){
+                if(edge.getId().equals(originStart))
+                    return true;
+                if(!path.contains(edge.getId())){
+                    path.add(edge.getId());
+                    return circleDetect(originStart, edge.getId(), path);
+                }
+            }
+        }
+        return false;
+    }
+
+    /*
+    @Description  :
+    ---------
+        删去图中所有与point相关的边，包括入边和出边
+    @Param        :
+    ---------
+
+    @Returns      :
+    ---------
+
+    */
+    public void removeVertex(T vertex){
+        vertexMap.remove(vertex);
+        EdgeNode<T, V> tempEdge=new EdgeNode<>(vertex, null);
+        for(T element:vertexMap.keySet()){
+            if(vertexMap.get(element).contains(tempEdge)){
+                vertexMap.get(element).remove(tempEdge);
+            }
+            if(vertexMap.get(element).isEmpty())
+                vertexMap.remove(element);
+        }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb=new StringBuilder();
+        for(T vertex:vertexMap.keySet()){
+            sb.append(vertex.toString());
+            sb.append("->");
+            Set<EdgeNode<T, V> > temp=vertexMap.get(vertex);
+            for(EdgeNode<T, V> edge:temp){
+                sb.append("("+edge.getId().toString()+","+edge.getValue().toString()+")");
+                sb.append("->");
+            }
+            sb=new StringBuilder(sb.substring(0, sb.length()-2));
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+}
+
+/*
+@Date      :
+---------
+    2022/04/21 11:02:29
+Description:
+---------
+    边节点，重写了hashCode和equals方法
+    此处两边相等仅考虑id，即目标边是否相同，注意，EdgeNode只在vertexMap中存在意义
+*/
+class EdgeNode<T, V>{
+    T id;// 目标节点的ID
+    V value;// 边的值
+
+    public EdgeNode(T targetId, V value){
+        id=targetId;
+        this.value=value;
+    }
+
+    public T getId() {
+        return this.id;
+    }
+
+    public void setId(T id) {
+        this.id = id;
+    }
+
+    public V getValue() {
+        return this.value;
+    }
+
+    public void setValue(V value) {
+        this.value = value;
+    }
+
+    @Override
+    public int hashCode() {
+        // TODO Auto-generated method stub
+        return id.hashCode();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public boolean equals(Object obj) {
+        // TODO Auto-generated method stub
+        if(obj==null)
+            return false;
+        if(obj.hashCode()!=hashCode())
+            return false;
+        if(this==obj)
+            return true;
+        if(!(obj instanceof EdgeNode))
+            return false;
+        EdgeNode<T, V> temp=(EdgeNode<T, V>)obj;
+        if(id.equals(temp.getId()))
+            return true;
+        else
+            return false;
+    }
+}
 // 锁管理器，管理Page层面上的锁
 class LockManager{
     // 存放了持有pageId对应Page的锁的transaction 集合以及锁类型
@@ -50,6 +283,8 @@ class LockManager{
     Map<TransactionId, Set<PageId>> transactionPageMap;
     // 用于对LockManager加锁
     Lock managerLock;
+    // 用于进行死锁检测的等待图
+    AdjacencyListGraph<TransactionId, Integer> waitGraph;
 
     // 构造函数
     public LockManager(){
@@ -57,6 +292,7 @@ class LockManager{
         conditionMap=new HashMap<>();
         transactionPageMap=new HashMap<>();
         managerLock=new ReentrantLock();
+        waitGraph=new AdjacencyListGraph<>();
     }
 
     // 检验申请的permissons与pageId当前的锁是否相容
@@ -102,6 +338,14 @@ class LockManager{
                 while (!isCompatible(permissions, pageId)) {
                     try {
                         // 该方法会抛出java.lang.IllegalMonitorStateException异常，为何（await()方法需要被其对应的锁对象的lock()与unlock()方法包裹
+//                        // 在等待图中新建边
+//                        Set<TransactionId> targetTidSet=locks.get(pageId).getT1();
+//                        for(TransactionId tid:targetTidSet)
+//                            waitGraph.insertEdge(transactionId, tid, null);
+//                        // 检查环的存在
+//                        if(waitGraph.circleDetect(transactionId, transactionId, new HashSet<>()))
+//                            throw new TransactionAbortedException();
+
                         conditionMap.get(pageId).await();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -393,6 +637,8 @@ public class BufferPool {
                 }
             }
         }
+        // 在等待图中移除所有与事务相关的边
+//        lockManager.waitGraph.removeVertex(tid);
         // 释放所有与该tid相关的锁
         Set<PageId> set=lockManager.transactionPageMap.get(tid);
         Set<PageId> clonedSet=new HashSet<>();

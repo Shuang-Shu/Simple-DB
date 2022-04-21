@@ -5,7 +5,6 @@
 
 ## 0. Introduction
 
-
 In this lab you will implement a B+ tree index for efficient lookups and range
 scans. We supply you with all of the low-level code you will need to implement
 the tree structure. You will implement searching, splitting pages,
@@ -441,7 +440,6 @@ You can also post on the class page on Piazza if you feel you have run into a bu
 
 ###  7.4 Grading
 <p>75% of your grade will be based on whether or not your code passes the system test suite we will run over it. These tests will be a superset of the tests we have provided. Before handing in your code, you should make sure it produces no errors (passes all of the tests) from both  <tt>ant test</tt> and <tt>ant systemtest</tt>.
-
 **Important:** before testing, gradescope will replace your <tt>build.xml</tt>, <tt>HeapFileEncoder.java</tt> and the
 entire contents of the <tt>test</tt> directory with our version of these files. This means you cannot change the format
 of <tt>.dat</tt> files!  You should also be careful changing our APIs. You should test that your code compiles the

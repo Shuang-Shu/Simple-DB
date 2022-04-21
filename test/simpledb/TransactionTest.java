@@ -71,6 +71,8 @@ public class TransactionTest extends TestUtil.CreateHeapFile {
    * Common unit test code for BufferPool.transactionComplete() covering
    * commit and abort. Verify that commit persists changes to disk, and
    * that abort reverts pages to their previous on-disk state.
+   * BufferPool.transactionComplete()的公共单元测试代码，
+   * 包括提交和中止。验证提交将更改持久化到磁盘，而abort将页面还原到磁盘上的前一个状态。
    */
   public void testTransactionComplete(boolean commit) throws Exception {
     HeapPage p = (HeapPage) bp.getPage(tid1, p2, Permissions.READ_WRITE);
