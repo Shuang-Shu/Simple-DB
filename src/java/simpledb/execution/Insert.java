@@ -98,7 +98,7 @@ public class Insert extends Operator {
         try {
             while (this.child.hasNext()) {
                 nextTuple = this.child.next();
-                Database.getBufferPool().insertTuple(null, this.tableId, nextTuple);
+                Database.getBufferPool().insertTuple(t, this.tableId, nextTuple);
                 count+=1;
             }
             if(!this.isInit)

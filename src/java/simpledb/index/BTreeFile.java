@@ -102,6 +102,7 @@ public class BTreeFile implements DbFile {
                 return new BTreeRootPtrPage(id, pageBuf);
             } else {
                 byte[] pageBuf = new byte[BufferPool.getPageSize()];
+//                跳过一定长度的文件区间
                 if (bis.skip(BTreeRootPtrPage.getPageSize() + (long) (id.getPageNumber() - 1) * BufferPool.getPageSize()) !=
                         BTreeRootPtrPage.getPageSize() + (long) (id.getPageNumber() - 1) * BufferPool.getPageSize()) {
                     throw new IllegalArgumentException(
@@ -181,14 +182,29 @@ public class BTreeFile implements DbFile {
 	 * @param pid - the current page being searched
 	 * @param perm - the permissions with which to lock the leaf page
 	 * @param f - the field to search for
-	 * @return the left-most leaf page possibly containing the key field f
+	 * @return the left-most leaf page **possibly** containing the key field f
 	 * 
 	 */
-	private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm,
-                                       Field f)
-					throws DbException, TransactionAbortedException {
+	private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm, Field f) throws DbException, TransactionAbortedException {
 		// some code goes here
-        return null;
+		// 考虑f非空情况
+		if(pid.pgcateg()==BTreePageId.LEAF){
+			// 若当前节点为叶节点
+			BTreePage currentPage= (BTreePage) getPage(tid, dirtypages, pid, perm);
+			return (BTreeLeafPage) currentPage;
+		}else{
+			// 此时当前节点并非叶节点
+			BTreePage currentPage= (BTreePage) getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+			if(pid.pgcateg()==BTreePageId.INTERNAL){
+				BTreeInternalPage internalPage=(BTreeInternalPage)currentPage;
+				// 1 找到满足f要求的域
+
+				// 2 递归搜索子节点
+				return findLeafPage(tid, dirtypages, pid, perm, f);
+			}
+		}
+
+		// 考虑f为空的情况
 	}
 	
 	/**

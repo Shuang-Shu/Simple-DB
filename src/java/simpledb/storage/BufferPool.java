@@ -68,6 +68,8 @@ class AdjacencyListGraph<T, V> {
     */
     public void insertEdge(T start, T end, V value){
         EdgeNode<T, V> newEdge=new EdgeNode<>(end, value);
+        if(end==null||start==null)
+            throw new NullPointerException("start与end不能为null");
         if(!vertexMap.containsKey(start)){
             Set<EdgeNode<T, V> > newSet=new HashSet<>();
             newSet.add(newEdge);
@@ -338,13 +340,13 @@ class LockManager{
                 while (!isCompatible(permissions, pageId)) {
                     try {
                         // 该方法会抛出java.lang.IllegalMonitorStateException异常，为何（await()方法需要被其对应的锁对象的lock()与unlock()方法包裹
-//                        // 在等待图中新建边
-//                        Set<TransactionId> targetTidSet=locks.get(pageId).getT1();
-//                        for(TransactionId tid:targetTidSet)
-//                            waitGraph.insertEdge(transactionId, tid, null);
-//                        // 检查环的存在
-//                        if(waitGraph.circleDetect(transactionId, transactionId, new HashSet<>()))
-//                            throw new TransactionAbortedException();
+                        // 在等待图中新建边
+                        Set<TransactionId> targetTidSet=locks.get(pageId).getT1();
+                        for(TransactionId tid:targetTidSet)
+                            waitGraph.insertEdge(transactionId, tid, null);
+                        // 检查环的存在
+                        if(waitGraph.circleDetect(transactionId, transactionId, new HashSet<>()))
+                            throw new TransactionAbortedException();
 
                         conditionMap.get(pageId).await();
                     } catch (InterruptedException e) {
@@ -638,7 +640,7 @@ public class BufferPool {
             }
         }
         // 在等待图中移除所有与事务相关的边
-//        lockManager.waitGraph.removeVertex(tid);
+        lockManager.waitGraph.removeVertex(tid);
         // 释放所有与该tid相关的锁
         Set<PageId> set=lockManager.transactionPageMap.get(tid);
         Set<PageId> clonedSet=new HashSet<>();

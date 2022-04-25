@@ -6,9 +6,7 @@
 ## 0. Introduction
 
 In this lab you will implement a B+ tree index for efficient lookups and range
-scans. We supply you with all of the low-level code you will need to implement
-the tree structure. You will implement searching, splitting pages,
-redistributing tuples between pages, and merging pages.
+scans. We supply you with all of the low-level code you will need to implement the tree structure. You will implement searching, splitting pages, redistributing tuples between pages, and merging pages.
 
 You may find it helpful to review sections 10.3--10.7 in the textbook, which
 provide detailed information about the structure of B+ trees as well as
@@ -42,10 +40,7 @@ GitHub repository:
 
 ## 2. Search
 
-Take a look at `index/` and `BTreeFile.java`. This is the core file for the implementation of
-the B+Tree and where you will write all your code for this lab. Unlike the
-HeapFile, the BTreeFile consists of four different kinds of pages. As you would
-expect, there are two different kinds of pages for the nodes of the tree:
+Take a look at `index/` and `BTreeFile.java`. This is the core file for the implementation of the B+Tree and where you will write all your code for this lab. Unlike the HeapFile, the BTreeFile consists of four different kinds of pages. As you would expect, there are two different kinds of pages for the nodes of the tree:
 internal pages and leaf pages. Internal pages are implemented in
 `BTreeInternalPage.java`, and leaf pages are implemented in
 `BTreeLeafPage.java`. For convenience, we have created an abstract class in
