@@ -6,6 +6,7 @@ import java.util.*;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.execution.IndexPredicate;
+import simpledb.execution.Operator;
 import simpledb.execution.Predicate.Op;
 import simpledb.common.DbException;
 import simpledb.common.Debug;
@@ -187,7 +188,9 @@ public class BTreeFile implements DbFile {
 	 */
 	private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm, Field f) throws DbException, TransactionAbortedException {
 		// some code goes here
+		// 考虑f为空的情况
 		// 考虑f非空情况
+		// 使用BTreeInternalPage.iterator()方法迭代每个内部节点的BTreeEntry
 		if(pid.pgcateg()==BTreePageId.LEAF){
 			// 若当前节点为叶节点
 			BTreePage currentPage= (BTreePage) getPage(tid, dirtypages, pid, perm);
@@ -198,13 +201,28 @@ public class BTreeFile implements DbFile {
 			if(pid.pgcateg()==BTreePageId.INTERNAL){
 				BTreeInternalPage internalPage=(BTreeInternalPage)currentPage;
 				// 1 找到满足f要求的域
-
-				// 2 递归搜索子节点
-				return findLeafPage(tid, dirtypages, pid, perm, f);
+				BTreeEntry entry=null;
+				Iterator<BTreeEntry> iter=internalPage.iterator();
+				while (iter.hasNext()){
+					entry=iter.next();
+					// 若f为null
+					if(f==null){
+						return findLeafPage(tid, dirtypages, entry.getLeftChild(), Permissions.READ_ONLY, f);
+					}
+					// 1 当前Entry的键与期望键相同，检查左子树是否有该键
+					// 2 f<= entry.getKey
+					if(f.compare(Op.LESS_THAN_OR_EQ, entry.getKey())){
+						if(f.compare(Op.EQUALS, entry.getKey()))
+							return findLeafPage(tid, dirtypages, entry.getRightChild(), Permissions.READ_ONLY, f);
+						else
+							return findLeafPage(tid, dirtypages, entry.getLeftChild(), Permissions.READ_ONLY, f);
+					}
+				}
+				return findLeafPage(tid, dirtypages, entry.getRightChild(), perm, f);
 			}
+			return null;// 不期望会到达此行
 		}
-
-		// 考虑f为空的情况
+//		return  null;
 	}
 	
 	/**
