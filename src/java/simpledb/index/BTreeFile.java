@@ -250,6 +250,7 @@ public class BTreeFile implements DbFile {
 	 * pointers as needed.  
 	 * 
 	 * Return the leaf page into which a new tuple with key field "field" should be inserted.
+	 * 返回一个叶页，其中应该插入一个关键字字段“field”的新元组
 	 * 
 	 * @param tid - the transaction id
 	 * @param dirtypages - the list of dirty pages which should be updated with all new dirty pages
@@ -273,8 +274,39 @@ public class BTreeFile implements DbFile {
 		// the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
 		// the sibling pointers of all the affected leaf pages.  Return the page into which a 
 		// tuple with the given key field should be inserted.
-        return null;
-		
+		// 获取可能存在对象的页page和该LeafPage的Parent
+        BTreeLeafPage leafPage=findLeafPage(tid, dirtypages, page.getId(),Permissions.READ_WRITE, field);
+		BTreeInternalPage parentPage = getParentWithEmptySlots(tid, dirtypages, leafPage.getParentId(), field);
+        // 如果未满，直接返回
+		if(leafPage.getNumEmptySlots()>0)
+			return leafPage;
+		// 若已满，则尝试分割
+		int tupleNum=leafPage.getNumTuples();
+		int rightTupleNum=tupleNum/2;
+		// 创建新的空BTreeLeafPage
+		BTreeLeafPage empty= (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+		// 将后半部分的key移入empty
+		Iterator<Tuple> tupleIterator=leafPage.reverseIterator();
+		for(int i=0;i<rightTupleNum;++i){
+			Tuple next=tupleIterator.next();
+			empty.insertTuple(next);
+			leafPage.deleteTuple(next);
+		}
+		// 将分割节点，分割节点是新页Page的第一个Field上插
+		Tuple tuple=empty.iterator().next();
+		Field key=tuple.getField(keyField());
+		parentPage.insertEntry(new BTreeEntry(key, leafPage.getId(), empty.getId()));
+		// 设置叶节点指针
+		// 原leafPage右侧节点
+		BTreeLeafPage originRightPage= (BTreeLeafPage) getPage(tid, dirtypages, leafPage.getRightSiblingId(), Permissions.READ_WRITE);
+		empty.setLeftSiblingId(empty.getId());
+		empty.setRightSiblingId(originRightPage.getId());
+		leafPage.setRightSiblingId(empty.getId());
+		originRightPage.setLeftSiblingId(empty.getId());
+		// 比较两个分裂的叶节点，选择field应该插入的Page
+		if(field.compare(Op.GREATER_THAN_OR_EQ, key))
+			return empty;
+		return leafPage;
 	}
 	
 	/**
@@ -311,6 +343,21 @@ public class BTreeFile implements DbFile {
 		// the parent pointers of all the children moving to the new page.  updateParentPointers()
 		// will be useful here.  Return the page into which an entry with the given key field
 		// should be inserted.
+		if(page.getNumEmptySlots()>0)
+			return page;
+		int rightEntriesNum=(page.getNumEntries()-1)/2;
+		int leftEntriesNum=page.getNumEntries()-rightEntriesNum-1;
+		// 获取父页面
+		BTreePageId parentId=page.getParentId();
+		BTreeInternalPage parentPage= (BTreeInternalPage) getPage(tid, dirtypages, parentId, Permissions.READ_WRITE);
+		// 创建新的内部节点
+		BTreeInternalPage empty= (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+		Iterator<BTreeEntry> entryIterator=page.reverseIterator();
+		for(int i=0;i<rightEntriesNum;++i){
+			BTreeEntry next=entryIterator.next();
+			empty.insertEntry(next);
+			page.d
+		}
 		return null;
 	}
 	
@@ -319,6 +366,8 @@ public class BTreeFile implements DbFile {
 	 * This may mean creating a page to become the new root of the tree, splitting the existing 
 	 * parent page if there are no empty slots, or simply locking and returning the existing parent page.
 	 *
+	 * 方法来封装使父页准备接受新条目的过程。这可能意味着创建一个页面来成为树的新根，
+	 * 如果没有空槽，则拆分现有的父页面，或者简单地锁定并返回现有的父页面。
 	 * @param tid - the transaction id
 	 * @param dirtypages - the list of dirty pages which should be updated with all new dirty pages
 	 * @param parentId - the id of the parent. May be an internal page or the RootPtr page

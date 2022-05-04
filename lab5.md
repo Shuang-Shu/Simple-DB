@@ -139,7 +139,6 @@ accept new entries. In that case, the parent should split and add a new entry to
 its parent. This may cause recursive splits and ultimately the creation of a new
 root node.
 
-
 In this exercise you will implement `splitLeafPage()` and `splitInternalPage()`
 in `BTreeFile.java`. If the page being split is the root page, you will need to
 create a new internal node to become the new root page, and update the
@@ -161,8 +160,8 @@ actually fall in the exact center of the tuples/entries to be split.  You should
 ignore the key during the split, and only use it to determine which of the two
 pages to return.)
 
-<p align="center"> <img width=500 src="splitting_leaf.png"><br> <img width=500
-src="splitting_internal.png"><br> <i>Figure 2: Splitting pages</i> </p>
+<p align="center"> <img width=500 src="splitting_leaf.png"><br> <img width=500 src="splitting_internal.png"><br> <i>Figure 2: Splitting pages</i> </p>
+
 
 
 Whenever you create a new page, either because of splitting a page or creating a
@@ -242,6 +241,7 @@ function to help debug your implementation, like we did in
 BTreeFileDeleteTest.java.
 
 **N.B.**
+
 1. The checker method should always pass after initialization of the tree and
    before starting and after completing a full call to key insertion or
    deletion, but not necessarily within internal methods.
