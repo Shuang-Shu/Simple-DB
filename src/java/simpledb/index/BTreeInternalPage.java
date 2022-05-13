@@ -484,10 +484,11 @@ public class BTreeInternalPage extends BTreePage {
 			throw new DbException("called insertEntry on page with no empty slots.");        
 
 		// find the child pointer matching the left or right child in this entry
+		// 在这个条目中找到匹配左子或右子的子指针
 		int lessOrEqKey = -1;
 		for (int i=0; i<numSlots; i++) {
 			if(isSlotUsed(i)) {
-				if(children[i] == e.getLeftChild().getPageNumber() || children[i] == e.getRightChild().getPageNumber()) {
+				if(children[i] == e.getLeftChild().getPageNumber() || children[i] == e.getRightChild().getPageNumber()) {//如果有一项的子指针与e一致
 					if(i > 0 && keys[i].compare(Op.GREATER_THAN, e.getKey())) {
 						throw new DbException("attempt to insert invalid entry with left child " + 
 								e.getLeftChild().getPageNumber() + ", right child " +

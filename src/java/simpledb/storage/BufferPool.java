@@ -467,7 +467,7 @@ public class BufferPool {
     /** Default number of pages passed to the constructor. This is used by
     other classes. BufferPool should use the numPages argument to the
     constructor instead. */
-    public static final int DEFAULT_PAGES = 50;
+    public static final int DEFAULT_PAGES = 450;
     private LockManager lockManager=new LockManager();
     // 这个锁用于保证只有一个事务能够新建进程
     Lock newPageLock=new ReentrantLock();
@@ -528,12 +528,15 @@ public class BufferPool {
                 if(temp!=null&&temp.getId().equals(pid))
                     return temp;
             }
-            if (this.bufferPool.size() < this.DEFAULT_PAGES) {
+            if (this.bufferPool.size() < DEFAULT_PAGES) {
                 // catalog单例中记录了数据库的全部信息，通过pid可以获取表的信息
                 // 若bufferpool有剩余，则直接在bufferpool中创建一个page镜像
                 try {
                     Page temp = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
                     this.bufferPool.add(temp);
+                    // 由于此时temp被返回，如果权限为读/写，则应将其标记为dirty
+                    if(perm==Permissions.READ_WRITE)
+                        temp.markDirty(true, tid);
                     return temp;
                 } catch (IllegalArgumentException e) {
                     // 此时磁盘文件中无此page
@@ -795,30 +798,31 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      * 从缓冲池中丢弃一个页面。将该页刷新到磁盘，以确保更新磁盘上的脏页
      * 此时写入磁盘的数据会覆盖满足一致性的数据，此时原始数据应该被记录，以防止事务被中断
+     * @throws DbException
      */
-    private synchronized  void evictPage() {
+    private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
         // 仅仅简单的替换掉第一个page
         // Lab4中需要修改该方法，保证不置换一个DirtyPage
         // 通过简单的遍历实现
-        try {
-            int index=-1;
-            for(int i=0;i<bufferPool.size();++i){
-                if(bufferPool.get(i).isDirty()==null){
-                    index=i;
-                    break;
-                }
+        int index=-1;
+        for(int i=0;i<bufferPool.size();++i){
+            if(bufferPool.get(i).isDirty()==null){
+                index=i;
+                break;
             }
-            if(index!=-1){
+        }
+        if(index!=-1){
+            try {
                 this.flushPage(this.bufferPool.get(index).getId());
-                this.discardPage(this.bufferPool.get(index).getId());
-            }else
-                throw new DbException("BufferPool中全为脏页，无法置换");
-        }catch (IOException e){
-            e.printStackTrace();
-        }catch (DbException e){
-            e.printStackTrace();
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            this.discardPage(this.bufferPool.get(index).getId());
+        }else{
+            throw new DbException("BufferPool中全为脏页，无法置换");
         }
     }
     private ArrayList<Page> bufferPool=null;

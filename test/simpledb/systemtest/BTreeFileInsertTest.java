@@ -93,17 +93,18 @@ public class BTreeFileInsertTest extends SimpleDbTestBase {
 		BTreeChecker.checkRep(empty, tid, new HashMap<>(), true);
 
 		// add a bunch of identical tuples
+		// 添加一组相同的元组
 		for (int i = 0; i < 5; ++i) {
 			for(int j = 0; j < 600; ++j) {
 				tup = BTreeUtility.getBTreeTuple(i, 2);
 				empty.insertTuple(tid, tup);
 			}
-
 		}
 
 		BTreeChecker.checkRep(empty, tid, new HashMap<>(), true);
 
 		// now search for some ranges and make sure we find all the tuples
+		// 现在搜索一些范围，并确保我们找到所有的元组
 		IndexPredicate ipred = new IndexPredicate(Op.EQUALS, new IntField(3));
 		DbFileIterator it = empty.indexIterator(tid, ipred);
 		it.open();
@@ -207,6 +208,7 @@ public class BTreeFileInsertTest extends SimpleDbTestBase {
 		assertTrue(rightChild.getNumEmptySlots() <= 252);
 
 		// now insert some random tuples and make sure we can find them
+		// 现在插入一些随机元组，确保我们能找到它们
 		Random rand = new Random();
 		for(int i = 0; i < 100; i++) {
 			int item = rand.nextInt(BTreeUtility.MAX_RAND_VALUE);

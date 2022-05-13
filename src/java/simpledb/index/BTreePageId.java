@@ -115,5 +115,4 @@ public class BTreePageId implements PageId {
 
 		return data;
 	}
-
 }

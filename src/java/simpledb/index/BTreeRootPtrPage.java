@@ -10,7 +10,7 @@ import java.io.*;
 /**
  * BTreeRootPtrPage stores the pointer to the root node used in the B+ tree and
  * implements Page Interface that is used by BufferPool
- *
+ * 这实际上是一个指向根节点的哑节点，方便处理树为空的情况
  * @see BufferPool
  */
 public class BTreeRootPtrPage implements Page {
@@ -22,7 +22,7 @@ public class BTreeRootPtrPage implements Page {
 
 	private final BTreePageId pid;
 
-    private int root;
+    private int root;// 此即指向根节点的指针
 	private int rootCategory;
 	private int header;
 

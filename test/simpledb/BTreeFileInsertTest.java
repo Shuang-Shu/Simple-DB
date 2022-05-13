@@ -124,8 +124,7 @@ public class BTreeFileInsertTest extends SimpleDbTestBase {
 		}
 		else { // parentEntry.getRightChild().equals(page.getId())
 			otherPage = (BTreeInternalPage) dirtypages.get(parentEntry.getLeftChild());
-			assertTrue(field.compare(Op.GREATER_THAN_OR_EQ, 
-					otherPage.reverseIterator().next().getKey()));
+			assertTrue(field.compare(Op.GREATER_THAN_OR_EQ, otherPage.reverseIterator().next().getKey()));
 		}
 		
 		int totalEntries = page.getNumEntries() + otherPage.getNumEntries();

@@ -18,4 +18,8 @@ class MyRunnable implements Runnable{
         for(int i=0;i<5;++i)
             System.out.println(word);
     }
+    public void test1(int k){
+        if(k==1)
+            throw new RuntimeException("???");
+    }
 }
