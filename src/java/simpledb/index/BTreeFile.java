@@ -695,6 +695,8 @@ public class BTreeFile implements DbFile {
 	 * half full.  Update the parent's entry so that the key matches the key field of the first
 	 * tuple in the right-hand page.
 	 * 
+	 * 从兄弟页面窃取元组并将它们复制到给定页面，以便两个页面都至少是半满的。更新父元素的条目，使键与右页中第一个元组的键字段相匹配。
+
 	 * @param page - the leaf page which is less than half full
 	 * @param sibling - the sibling which has tuples to spare
 	 * @param parent - the parent of the two leaf pages
@@ -710,6 +712,40 @@ public class BTreeFile implements DbFile {
         // Move some of the tuples from the sibling to the page so
 		// that the tuples are evenly distributed. Be sure to update
 		// the corresponding parent entry.
+		// 将一些元组从同级移动到页面，以便元组均匀分布。
+		// 确保更新了相应的父条目。
+		BTreeLeafPage leftPage,rightPage;
+		if(isRightSibling){
+			leftPage=page;
+			rightPage=sibling;
+		}else{
+			leftPage=sibling;
+			rightPage=page;
+		}
+		Field orginKey=rightPage.getTuple(0).getField(keyField());
+		int pageTupleNum=page.getNumTuples();
+		int siblingTupleNum=sibling.getNumTuples();
+		int leftTupleNum=(pageTupleNum+siblingTupleNum)/2;
+		int rightTupleNum=pageTupleNum+siblingTupleNum-leftTupleNum;
+		int index=0;
+		Tuple[] tuples=new Tuple[pageTupleNum+siblingTupleNum];
+		Iterator<Tuple> leftIter, rightIter;
+		leftIter=leftPage.iterator();
+		rightIter=rightPage.iterator();
+		while(leftIter.hasNext())
+			tuples[index++]=leftIter.next();
+		while(rightIter.hasNext())
+			tuples[index++]=rightIter.next();
+		leftPage.clearTuples();
+		rightPage.clearTuples();
+		for(int i=0;i<leftTupleNum;++i)
+			leftPage.insertTuple(tuples[i]);
+		for(int i=leftTupleNum;i<leftTupleNum+rightTupleNum;++i)
+			rightPage.insertTuple(tuples[i]);
+		Field newKey=rightPage.getTuple(0).getField(keyField());
+		// 更新父页面
+		parent.deleteKeyAndRightChild(new BTreeEntry(orginKey, leftPage.getId(), rightPage.getId()));
+		parent.insertEntry(new BTreeEntry(newKey, leftPage.getId(), rightPage.getId()));
 	}
 
 	/**
@@ -789,6 +825,18 @@ public class BTreeFile implements DbFile {
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
 		// pointers of all children in the entries that were moved.
+		int leftEntryNum=leftSibling.getNumEntries();
+		int rightEntryNum=page.getNumEntries();
+		int newLeftEntryNum=(leftEntryNum+rightEntryNum)/2;
+		int newRightEntryNum=leftEntryNum+rightEntryNum-newLeftEntryNum;
+		if(leftEntryNum<newLeftEntryNum){
+			// 左侧页面节点偏少
+			int entryNumDelta=newLeftEntryNum-leftEntryNum;
+			leftSibling.insertEntry(parentEntry);
+		}else if(leftEntryNum>newLeftEntryNum){
+			// 左侧页面节点偏多
+			page.insertEntry(new BTreeEntry(parentEntry.getKey(), page.iterator().next().getLeftChild(), leftSibling.reverseIterator().next().getRightChild()));
+		}
 	}
 	
 	/**
@@ -816,6 +864,7 @@ public class BTreeFile implements DbFile {
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
 		// pointers of all children in the entries that were moved.
+		
 	}
 	
 	/**

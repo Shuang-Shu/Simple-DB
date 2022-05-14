@@ -329,7 +329,6 @@ tests in `BTreeFileDeleteTest.java` (such as `testStealFromLeftLeafPage` and
 `testStealFromRightLeafPage`).  The system tests may take several seconds to
 complete since they create a large B+ tree in order to fully test the system.
 
-
 **Exercise 4: Merging pages**
 
 Implement  `BTreeFile.mergeLeafPages()` and `BTreeFile.mergeInternalPages()`.

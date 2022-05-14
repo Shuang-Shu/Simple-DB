@@ -518,6 +518,12 @@ public class BTreeLeafPage extends BTreePage {
 			throw new NoSuchElementException();
 		}
 	}
+
+	public void clearTuples() throws DbException{
+		for(int i=0;i<getNumTuples();++i){
+			this.deleteTuple(tuples[i]);
+		}
+	}
 }
 
 /**
