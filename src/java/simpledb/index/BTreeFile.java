@@ -3,6 +3,8 @@ package simpledb.index;
 import java.io.*;
 import java.util.*;
 
+import javax.swing.plaf.PanelUI;
+
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.execution.IndexPredicate;
@@ -728,24 +730,32 @@ public class BTreeFile implements DbFile {
 		int leftTupleNum=(pageTupleNum+siblingTupleNum)/2;
 		int rightTupleNum=pageTupleNum+siblingTupleNum-leftTupleNum;
 		int index=0;
-		Tuple[] tuples=new Tuple[pageTupleNum+siblingTupleNum];
+		// Tuple[] tuples=new Tuple[pageTupleNum+siblingTupleNum];
 		Iterator<Tuple> leftIter, rightIter;
-		leftIter=leftPage.iterator();
+		leftIter=leftPage.reverseIterator();
 		rightIter=rightPage.iterator();
-		while(leftIter.hasNext())
-			tuples[index++]=leftIter.next();
-		while(rightIter.hasNext())
-			tuples[index++]=rightIter.next();
-		leftPage.clearTuples();
-		rightPage.clearTuples();
-		for(int i=0;i<leftTupleNum;++i)
-			leftPage.insertTuple(tuples[i]);
-		for(int i=leftTupleNum;i<leftTupleNum+rightTupleNum;++i)
-			rightPage.insertTuple(tuples[i]);
-		Field newKey=rightPage.getTuple(0).getField(keyField());
+		int realLeftTupleNum=leftPage.getNumTuples();
+		if(realLeftTupleNum>leftTupleNum){
+			// 此时左侧叶节点的tuples数量偏多
+			for(int i=0;i<realLeftTupleNum-leftTupleNum;++i){
+				Tuple temp=leftIter.next();
+				leftPage.deleteTuple(temp);
+				rightPage.insertTuple(temp);
+			}
+		}else{
+			// 此时左侧叶节点的tuples数量偏少
+			for(int i=0;i<leftTupleNum-realLeftTupleNum;++i){
+				Tuple temp=rightIter.next();
+				rightPage.deleteTuple(temp);
+				leftPage.insertTuple(temp);
+			}
+		}
+
+		Field newKey=rightPage.iterator().next().getField(keyField());
 		// 更新父页面
-		parent.deleteKeyAndRightChild(new BTreeEntry(orginKey, leftPage.getId(), rightPage.getId()));
-		parent.insertEntry(new BTreeEntry(newKey, leftPage.getId(), rightPage.getId()));
+		entry.setKey(newKey);
+		entry.setLeftChild(leftPage.getId());
+		entry.setRightChild(rightPage.getId());
 	}
 
 	/**
@@ -825,20 +835,77 @@ public class BTreeFile implements DbFile {
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
 		// pointers of all children in the entries that were moved.
+		stealFromSiblingInternal(tid, dirtypages, page, leftSibling, parent, parentEntry);
+	}
+
+	public void stealFromSiblingInternal(TransactionId tid, Map<PageId, Page> dirtypages,
+	BTreeInternalPage page, BTreeInternalPage leftSibling, BTreeInternalPage parent,
+	BTreeEntry parentEntry) throws DbException, TransactionAbortedException{
 		int leftEntryNum=leftSibling.getNumEntries();
 		int rightEntryNum=page.getNumEntries();
 		int newLeftEntryNum=(leftEntryNum+rightEntryNum)/2;
-		int newRightEntryNum=leftEntryNum+rightEntryNum-newLeftEntryNum;
 		if(leftEntryNum<newLeftEntryNum){
 			// 左侧页面节点偏少
-			int entryNumDelta=newLeftEntryNum-leftEntryNum;
-			leftSibling.insertEntry(parentEntry);
+			for(int i=0;i<newLeftEntryNum-leftEntryNum;++i)
+				leftRotate(leftSibling, page, parent, parentEntry, dirtypages);
 		}else if(leftEntryNum>newLeftEntryNum){
 			// 左侧页面节点偏多
-			page.insertEntry(new BTreeEntry(parentEntry.getKey(), page.iterator().next().getLeftChild(), leftSibling.reverseIterator().next().getRightChild()));
+			for(int i=0;i<leftEntryNum-newLeftEntryNum;++i)
+				rightRotate(leftSibling, page, parent, parentEntry, dirtypages);
 		}
+		updateParentPointers(tid, dirtypages, page);
+		updateParentPointers(tid, dirtypages, leftSibling);
+		updateParentPointers(tid, dirtypages, parent);
 	}
 	
+	/*
+	@Description  :
+	---------
+		在3个Page间进行Entry的右旋
+	@Param        :
+	---------
+		
+	@Returns      :
+	---------
+		void
+	*/
+	private void rightRotate(BTreeInternalPage leftPage, BTreeInternalPage rightPage, BTreeInternalPage parent, BTreeEntry parentEntry, Map<PageId, Page> dirtypages) throws DbException{
+		dirtypages.put(leftPage.getId(), leftPage);
+		dirtypages.put(rightPage.getId(), rightPage);
+		dirtypages.put(parent.getId(), parent);
+		BTreeEntry entry=new BTreeEntry(leftPage.reverseIterator().next().getKey(), parentEntry.getLeftChild(), parentEntry.getRightChild());
+		parent.deleteKeyAndRightChild(parentEntry);
+		parentEntry.setLeftChild(leftPage.reverseIterator().next().getRightChild());
+		parentEntry.setRightChild(rightPage.iterator().next().getLeftChild());
+		rightPage.insertEntry(parentEntry);
+		parent.insertEntry(entry);
+		leftPage.deleteKeyAndRightChild(leftPage.reverseIterator().next());
+	}
+
+	/*
+	@Description  :
+	---------
+		在3个Page间进行Entry的左旋
+	@Param        :
+	---------
+		
+	@Returns      :
+	---------
+		void
+	*/
+	private void leftRotate(BTreeInternalPage leftPage, BTreeInternalPage rightPage, BTreeInternalPage parent, BTreeEntry parentEntry, Map<PageId, Page> dirtypages) throws DbException{
+		dirtypages.put(leftPage.getId(), leftPage);
+		dirtypages.put(rightPage.getId(), rightPage);
+		dirtypages.put(parent.getId(), parent);
+		BTreeEntry entry=new BTreeEntry(rightPage.iterator().next().getKey(), parentEntry.getLeftChild(), parentEntry.getRightChild());
+		parent.deleteKeyAndRightChild(parentEntry);
+		parentEntry.setLeftChild(leftPage.reverseIterator().next().getRightChild());
+		parentEntry.setRightChild(rightPage.iterator().next().getLeftChild());
+		leftPage.insertEntry(parentEntry);
+		parent.insertEntry(entry);
+		rightPage.deleteKeyAndLeftChild(leftPage.reverseIterator().next());
+	}
+
 	/**
 	 * Steal entries from the right sibling and copy them to the given page so that both pages are at least
 	 * half full. Keys can be thought of as rotating through the parent entry, so the original key in the 
@@ -864,7 +931,7 @@ public class BTreeFile implements DbFile {
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
 		// pointers of all children in the entries that were moved.
-		
+		stealFromSiblingInternal(tid, dirtypages, rightSibling, page, parent, parentEntry);
 	}
 	
 	/**
@@ -891,10 +958,23 @@ public class BTreeFile implements DbFile {
 
 		// some code goes here
         //
-		// Move all the tuples from the right page to the left page, update
+		// Move all the tuples (from the right page to the left page), update
 		// the sibling pointers, and make the right page available for reuse.
 		// Delete the entry in the parent corresponding to the two pages that are merging -
 		// deleteParentEntry() will be useful here
+		Iterator<Tuple> rightIter=rightPage.iterator();
+		// 设置脏页
+		dirtypages.put(leftPage.getId(), leftPage);
+		dirtypages.put(rightPage.getId(), rightPage);
+		dirtypages.put(parent.getId(), parent);
+		while(rightIter.hasNext()){
+			Tuple temp=rightIter.next();
+			rightPage.deleteTuple(temp);
+			leftPage.insertTuple(temp);
+		}
+		leftPage.setRightSiblingId(null);
+		rightPage.setLeftSiblingId(null);
+		parent.deleteKeyAndRightChild(parentEntry);
 	}
 
 	/**
@@ -928,6 +1008,7 @@ public class BTreeFile implements DbFile {
 		// and make the right page available for reuse
 		// Delete the entry in the parent corresponding to the two pages that are merging -
 		// deleteParentEntry() will be useful here
+		
 	}
 	
 	/**

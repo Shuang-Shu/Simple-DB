@@ -349,7 +349,7 @@ public class BTreeLeafPage extends BTreePage {
 		else {
 			for(int i = emptySlot; i > lessOrEqKey + 1; i--) {
 				moveRecord(i-1, i);
-			}
+			} 
 			goodSlot = lessOrEqKey + 1;
 		}
 
