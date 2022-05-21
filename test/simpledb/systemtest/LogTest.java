@@ -45,7 +45,7 @@ public class LogTest extends SimpleDbTestBase {
         insert.close();
     }
 
-    // check that the specified tuple is, or is not, present
+    // check that the specified tuple is, or is not, present 检查指定的元组是否存在
     void look(HeapFile hf, Transaction t, int v1, boolean present)
         throws DbException, TransactionAbortedException {
         int count = 0;
@@ -82,7 +82,7 @@ public class LogTest extends SimpleDbTestBase {
     void abort(Transaction t)
         throws IOException {
         // t.transactionComplete(true); // abort
-        Database.getBufferPool().flushAllPages(); // XXX defeat NO-STEAL-based abort
+        Database.getBufferPool().flushAllPages(); // XXX defeat NO-STEAL-based abort 击败NO-STEAL-based中止
         Database.getLogFile().logAbort(t.getId()); // does rollback too
         Database.getBufferPool().flushAllPages(); // prevent NO-STEAL-based abort from
                                                   // un-doing the rollback

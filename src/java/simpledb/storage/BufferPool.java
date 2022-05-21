@@ -624,7 +624,11 @@ public class BufferPool {
                 if(temp==tid){
                     // 该page应该被持久化
                     try {
-                        flushPage(bufferPool.get(i).getId());
+                        Page flushPage=bufferPool.get(i);
+                        // ---------- Lab6添加的内容
+                        flushPage.setBeforeImage();
+                        // ----------
+                        flushPage(flushPage.getId());
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -779,6 +783,13 @@ public class BufferPool {
         while (iterator.hasNext()){
             Page temp=iterator.next();
             if(temp.getId().equals(pid)){
+                // ---------- Lab6 添加的内容
+                TransactionId dirtier = temp.isDirty();
+                if (dirtier != null){
+                    Database.getLogFile().logWrite(dirtier, temp.getBeforeImage(), temp);
+                    Database.getLogFile().force();
+                }
+                // ----------
                 Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(temp);
                 return;
             }

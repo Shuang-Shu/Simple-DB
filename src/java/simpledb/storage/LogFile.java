@@ -26,6 +26,10 @@ pages (on checkpoints and recovery.)  This can lead to deadlock.  For
 that reason, any LogFile operation that needs to access the BufferPool
 must not be declared synchronized and must begin with a block like:
 
+这里的许多方法都是同步的(以防止并发日志写入发生);BufferPool中的许多方法也是同步的(出于类似的原因)。
+问题是BufferPool写日志记录(在页面刷新时)，日志文件刷新BufferPool页面(在检查点和恢复时)。这可能导致死锁。
+因此，任何需要访问BufferPool的LogFile操作都不能被声明为synchronized，并且必须像这样以块开头:
+
 <p>
 <pre>
     synchronized (Database.getBufferPool()) {
@@ -45,25 +49,34 @@ must not be declared synchronized and must begin with a block like:
 
 <li> The first long integer of the file represents the offset of the
 last written checkpoint, or -1 if there are no checkpoints
+文件的第一个长整数表示最后一个写入检查点的偏移量，如果没有检查点，则为-1
 
 <li> All additional data in the log consists of log records.  Log
 records are variable length.
+日志中的所有附加数据都由日志记录组成。日志记录是可变长度的。
 
 <li> Each log record begins with an integer type and a long integer
 transaction id.
+每个日志记录以一个整数类型和一个长整数事务id开始。
 
 <li> Each log record ends with a long integer file offset representing
 the position in the log file where the record began.
+每个日志记录以一个整数类型和一个长整数事务id开始。
 
 <li> There are five record types: ABORT, COMMIT, UPDATE, BEGIN, and
 CHECKPOINT
+有五种记录类型:ABORT、COMMIT、UPDATE、BEGIN和CHECKPOINT
 
 <li> ABORT, COMMIT, and BEGIN records contain no additional data
+ABORT、COMMIT和BEGIN记录不包含任何其他数据
 
 <li>UPDATE RECORDS consist of two entries, a before image and an
 after image.  These images are serialized Page objects, and can be
 accessed with the LogFile.readPageData() and LogFile.writePageData()
 methods.  See LogFile.print() for an example.
+
+UPDATE RECORDS由两个条目组成，一个前镜像和一个后镜像。这些镜像是序列化的Page对象，
+可以通过LogFile.readPageData()和LogFile.writePageData()方法访问。参见LogFile.print()的示例。
 
 <li> CHECKPOINT records consist of active transactions at the time
 the checkpoint was taken and their first log record on disk.  The format
@@ -71,19 +84,23 @@ of the record is an integer count of the number of transactions, as well
 as a long integer transaction id and a long integer first record offset
 for each active transaction.
 
+检查点记录由检查点被获取时的活动事务和它们在磁盘上的第一个日志记录组成。
+记录的格式是事务数的整数计数，以及每个活动事务的长整数事务id和长整数第一个记录偏移量
+
 </ul>
 */
 public class LogFile {
 
     final File logFile;
     private RandomAccessFile raf;
-    Boolean recoveryUndecided; // no call to recover() and no append to log
+    Boolean recoveryUndecided; // no call to recover() and no append to log 没有调用recover()，也没有追加到日志
 
     static final int ABORT_RECORD = 1;
     static final int COMMIT_RECORD = 2;
     static final int UPDATE_RECORD = 3;
     static final int BEGIN_RECORD = 4;
     static final int CHECKPOINT_RECORD = 5;
+
     static final long NO_CHECKPOINT_ID = -1;
 
     final static int INT_SIZE = 4;
@@ -103,6 +120,8 @@ public class LogFile {
         So we make this decision lazily: if someone calls recover(), then
         do it, while if someone starts adding log file entries, then first
         throw out the initial log file contents.
+
+        用指定的文件初始化并返回日志文件。我们还不确定调用方是否正在创建一个全新的DB,在这种情况下,我们应该忽略日志文件,或者调用者是否最终想要恢复(在填充目录之后)。因此,我们推迟了这个决定:如果有人调用恢复(),那么就去做吧,如果有人开始添加日志文件条目,那么首先抛出初始日志文件内容
 
         @param f The log file's name
     */
@@ -125,12 +144,15 @@ public class LogFile {
     // we're about to append a log record. if we weren't sure whether the
     // DB wants to do recovery, we're sure now -- it didn't. So truncate
     // the log.
+    // 我们将附加一个日志记录。
+    // 如果我们不确定DB是否想要恢复,我们现在确定--它不想恢复。所以对日志进行截断
     void preAppend() throws IOException {
         totalRecords++;
         if(recoveryUndecided){
             recoveryUndecided = false;
             raf.seek(0);
             raf.setLength(0);
+            // 截断文件，并写入 写入检查点的偏移量-1，即阶段后不再有写入检查点
             raf.writeLong(NO_CHECKPOINT_ID);
             raf.seek(raf.length());
             currentOffset = raf.getFilePointer();
@@ -143,11 +165,13 @@ public class LogFile {
     
     /** Write an abort record to the log for the specified tid, force
         the log to disk, and perform a rollback
+        将终止记录写入指定tid的日志，将日志强制写入磁盘，然后执行回滚
         @param tid The aborting transaction.
     */
     public void logAbort(TransactionId tid) throws IOException {
         // must have buffer pool lock before proceeding, since this
         // calls rollback
+        // 在继续之前必须有缓冲池锁，因为这将调用回滚
 
         synchronized (Database.getBufferPool()) {
 
@@ -155,11 +179,13 @@ public class LogFile {
                 preAppend();
                 //Debug.log("ABORT");
                 //should we verify that this is a live transaction?
+                // 我们是否应该验证这是一个实时事务?
 
                 // must do this here, since rollback only works for
                 // live transactions (needs tidToFirstLogRecord)
+                // 必须在这里做这个，因为回滚只对活动事务有效(需要tidToFirstLogRecord)
                 rollback(tid);
-
+                // 向日志写入值
                 raf.writeInt(ABORT_RECORD);
                 raf.writeLong(tid.getId());
                 raf.writeLong(currentOffset);
@@ -173,6 +199,7 @@ public class LogFile {
     /** Write a commit record to disk for the specified tid,
         and force the log to disk.
 
+        将指定tid的提交记录写入磁盘，并强制日志写入磁盘。
         @param tid The committing transaction.
     */
     public synchronized void logCommit(TransactionId tid) throws IOException {
@@ -190,6 +217,8 @@ public class LogFile {
 
     /** Write an UPDATE record to disk for the specified tid and page
         (with provided         before and after images.)
+
+        将指定tid和page的UPDATE记录写入磁盘(提供前后映像)
         @param tid The transaction performing the write
         @param before The before image of the page
         @param after The after image of the page
@@ -208,10 +237,17 @@ public class LogFile {
            before page data (see writePageData)
            after page data
            start offset
+
+            更新记录由
+                记录类型
+                事务id
+                在页面数据之前(参见writePageData)
+                后页面数据
+                起始偏移量
         */
         raf.writeInt(UPDATE_RECORD);
         raf.writeLong(tid.getId());
-
+        // 写入数据
         writePageData(raf,before);
         writePageData(raf,after);
         raf.writeLong(currentOffset);
@@ -231,6 +267,15 @@ public class LogFile {
         // id class data
         // page class bytes
         // page class data
+        /**
+         *  页面数据是:
+                页面类名
+                id类名
+                id类字节
+                id类数据
+                页面类字节
+                页面类数据
+         */
 
         String pageClassName = p.getClass().getName();
         String idClassName = pid.getClass().getName();
@@ -289,6 +334,7 @@ public class LogFile {
     }
 
     /** Write a BEGIN record for the specified transaction
+     * 为指定的事务写入BEGIN记录
         @param tid The transaction that is beginning
 
     */
@@ -300,9 +346,9 @@ public class LogFile {
             throw new IOException("double logXactionBegin()");
         }
         preAppend();
-        raf.writeInt(BEGIN_RECORD);
-        raf.writeLong(tid.getId());
-        raf.writeLong(currentOffset);
+        raf.writeInt(BEGIN_RECORD); // 事务开始
+        raf.writeLong(tid.getId()); // 事务id
+        raf.writeLong(currentOffset); // 偏移量
         tidToFirstLogRecord.put(tid.getId(), currentOffset);
         currentOffset = raf.getFilePointer();
 
@@ -310,6 +356,7 @@ public class LogFile {
     }
 
     /** Checkpoint the log and write a checkpoint record. */
+    // 对日志进行检查点并写入检查点记录
     public void logCheckpoint() throws IOException {
         //make sure we have buffer pool lock before proceeding
         synchronized (Database.getBufferPool()) {
@@ -352,6 +399,7 @@ public class LogFile {
 
     /** Truncate any unneeded portion of the log to reduce its space
         consumption */
+    // 截断日志中任何不需要的部分，以减少其空间消耗
     public synchronized void logTruncate() throws IOException {
         preAppend();
         raf.seek(0);
@@ -452,6 +500,10 @@ public class LogFile {
         transactions that have already committed (though this may not
         be enforced by this method.)
 
+        回滚指定的事务，将其更新的任何页面的状态设置为更新前的状态。
+        为了保持事务语义，不应该对已经提交的事务调用该函数
+        (尽管该方法可能不会强制执行该函数)。
+
         @param tid The transaction to rollback
     */
     public void rollback(TransactionId tid)
@@ -460,6 +512,48 @@ public class LogFile {
             synchronized(this) {
                 preAppend();
                 // some code goes here
+                // 找到所有与中止事务相关的更新记录
+                Long offset=tidToFirstLogRecord.get(tid.getId());
+                RandomAccessFile rafPointer=raf;
+                rafPointer.seek(offset);
+                while (true) {
+                    try {
+                        int cpType = raf.readInt();
+                        long cpTid = raf.readLong();
+
+                        if(cpTid!=tid.getId())
+                            break;
+
+                        switch (cpType) {
+                        case BEGIN_RECORD:
+                            // 简单地略过
+                            raf.readLong();
+                            break;
+                        case ABORT_RECORD:
+                            // 简单地略过
+                            raf.readLong();
+                            break;
+                        case COMMIT_RECORD:
+                            // 简单地略过
+                            raf.readLong();
+                            break;
+                        case CHECKPOINT_RECORD:
+                            // 暂不处理
+                            break;
+                        case UPDATE_RECORD:
+                            // 此时针对更新记录恢复磁盘文件
+                            Page before = readPageData(raf);
+                            Page after = readPageData(raf);
+                            // 将所有的after恢复为before
+                            
+                            break;
+                        }
+        
+                    } catch (EOFException e) {
+                        //e.printStackTrace();
+                        break;
+                    }
+                }
             }
         }
     }

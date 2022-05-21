@@ -67,14 +67,14 @@ Here's what to do:
         }
     ```
   This causes the logging system to write an update to the log.  
-  We force the log to ensure
-  the log record is on disk before the page is written to disk.
+  We force the log to ensure the log record is on disk before the page is written to disk.
 
 
 2. Your `BufferPool.transactionComplete()` calls `flushPage()`
    for each page that a committed transaction dirtied. For each such
    page, add a call to `p.setBeforeImage()` after you have flushed
    the page:
+   
    ```
    // use current page contents as the before-image
    // for the next transaction that modifies this page.
@@ -127,8 +127,7 @@ Here's what to do:
 
 Read the comments in `LogFile.java` for a description of
 the log file format.
-You should see in `LogFile.java` a set of functions, such as
-`logCommit()`, that generate each kind of log record and append
+You should see in `LogFile.java` a set of functions, such as `logCommit()`, that generate each kind of log record and append
 it to the log.
 
 
@@ -159,7 +158,6 @@ method useful for displaying the current contents of the log.
 
 
 Implement LogFile.rollback().
-
 
 After completing this exercise, you should be able to pass the
 TestAbort and
