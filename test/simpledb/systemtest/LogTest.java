@@ -45,7 +45,8 @@ public class LogTest extends SimpleDbTestBase {
         insert.close();
     }
 
-    // check that the specified tuple is, or is not, present 检查指定的元组是否存在
+    // check that the specified tuple is, or is not, present 
+    // 检查指定的元组是否存在
     void look(HeapFile hf, Transaction t, int v1, boolean present)
         throws DbException, TransactionAbortedException {
         int count = 0;
@@ -82,7 +83,7 @@ public class LogTest extends SimpleDbTestBase {
     void abort(Transaction t)
         throws IOException {
         // t.transactionComplete(true); // abort
-        Database.getBufferPool().flushAllPages(); // XXX defeat NO-STEAL-based abort 击败NO-STEAL-based中止
+        Database.getBufferPool().flushAllPages(); // XXX defeat NO-STEAL-based abort 违反NO-STEAL-based的策略并中止
         Database.getLogFile().logAbort(t.getId()); // does rollback too
         Database.getBufferPool().flushAllPages(); // prevent NO-STEAL-based abort from
                                                   // un-doing the rollback
@@ -242,10 +243,13 @@ public class LogTest extends SimpleDbTestBase {
 
         Transaction t = new Transaction();
         t.start();
+        // 这两个值由t0提交，因此存在
         look(hf1, t, 1, true);
         look(hf1, t, 2, true);
+        // 这两个值由t1提交，而t1中断，因此这两个值不应该存在
         look(hf1, t, 3, false);
         look(hf1, t, 4, false);
+        // t2已提交，因此这两个元素存在
         look(hf2, t, 21, true);
         look(hf2, t, 22, true);
         t.commit();

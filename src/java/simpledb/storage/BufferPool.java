@@ -8,6 +8,7 @@ import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
+import java.beans.Transient;
 import java.io.*;
 import java.util.*;
 
@@ -549,6 +550,7 @@ public class BufferPool {
                     try {
                         temp = new HeapPage((HeapPageId) pid, blankData);
                         this.bufferPool.add(temp);
+                        // 此处将新创建的页面直接写回磁盘
                         this.flushPage(pid);
                     } catch (IOException ioException) {
                         ioException.printStackTrace();
@@ -836,5 +838,20 @@ public class BufferPool {
             throw new DbException("BufferPool中全为脏页，无法置换");
         }
     }
+    // 自己添加的函数，用于rollback
+    public void setPage(TransactionId tid, PageId pid, Permissions perm, Page oldPage, Page newPage){
+        int index=-1;
+        int count=0;
+        for(Page page:bufferPool){
+            if(page.getId().equals(oldPage.getId())){
+                index=count;
+                break;
+            }
+            count++;
+        }
+        lockManager.requestLock(tid, bufferPool.get(index).getId(), perm);
+        bufferPool.set(index, newPage);
+    }
+
     private ArrayList<Page> bufferPool=null;
 }

@@ -2,12 +2,19 @@
 package simpledb.storage;
 
 import simpledb.common.Database;
+import simpledb.common.DbException;
 import simpledb.transaction.TransactionId;
 import simpledb.common.Debug;
+import simpledb.common.Permissions;
 
 import java.io.*;
 import java.util.*;
+
+import javax.lang.model.element.Element;
+import javax.xml.crypto.Data;
+
 import java.lang.reflect.*;
+import java.security.Permission;
 
 /*
 LogFile implements the recovery subsystem of SimpleDb.  This class is
@@ -373,6 +380,7 @@ public class LogFile {
                 raf.writeLong(-1); //no tid , but leave space for convenience
 
                 //write list of outstanding transactions
+                // 写入未完成事务的清单
                 raf.writeInt(keys.size());
                 while (els.hasNext()) {
                     Long key = els.next();
@@ -513,44 +521,74 @@ public class LogFile {
                 preAppend();
                 // some code goes here
                 // 找到所有与中止事务相关的更新记录
-                Long offset=tidToFirstLogRecord.get(tid.getId());
-                RandomAccessFile rafPointer=raf;
-                rafPointer.seek(offset);
+                raf.seek(0);
+                Long checkPoint=raf.readLong();
+                Set<Long> uncommittedTids=new HashSet<>();
+                Long offset=Long.valueOf(-1);
+                if(checkPoint==-1){
+                    // 如果没有检查点，则使用第一个记录的位置
+                    offset=tidToFirstLogRecord.get(tid.getId());
+                    uncommittedTids.add(tid.getId());
+                }
+                else{
+                    // 否则，检索checkpoint，获取相应tid的offset，同时记录所有未完成的
+                    raf.seek(checkPoint);
+                    raf.readInt();
+                    raf.readLong();
+                    int numTransactions = raf.readInt();
+                    while (numTransactions-- > 0) {
+                        Long uncommittedTid=raf.readLong();// tid
+                        uncommittedTids.add(uncommittedTid);
+                        Long recordOffset=raf.readLong();
+                        if(uncommittedTid==tid.getId()){// FIRST LOG RECORD
+                            offset=recordOffset;
+                        }
+                    }
+                    raf.readLong();
+                }
+                raf.seek(offset);
                 while (true) {
                     try {
                         int cpType = raf.readInt();
                         long cpTid = raf.readLong();
 
-                        if(cpTid!=tid.getId())
+                        if(!uncommittedTids.contains(cpTid))
                             break;
 
                         switch (cpType) {
-                        case BEGIN_RECORD:
-                            // 简单地略过
-                            raf.readLong();
-                            break;
-                        case ABORT_RECORD:
-                            // 简单地略过
-                            raf.readLong();
-                            break;
-                        case COMMIT_RECORD:
-                            // 简单地略过
-                            raf.readLong();
-                            break;
-                        case CHECKPOINT_RECORD:
-                            // 暂不处理
-                            break;
-                        case UPDATE_RECORD:
-                            // 此时针对更新记录恢复磁盘文件
-                            Page before = readPageData(raf);
-                            Page after = readPageData(raf);
-                            // 将所有的after恢复为before
-                            
-                            break;
+                            case BEGIN_RECORD:
+                                // 简单地略过
+                                raf.readLong();
+                                break;
+                            case ABORT_RECORD:
+                                // 简单地略过
+                                raf.readLong();
+                                break;
+                            case COMMIT_RECORD:
+                                // 简单地略过
+                                raf.readLong();
+                                break;
+                            case CHECKPOINT_RECORD:
+                                // 暂不处理
+                                int numTransactions = raf.readInt();
+                                while (numTransactions-- > 0) {
+                                    raf.readLong();// tid
+                                    raf.readLong();// FIRST LOG RECORD
+                                }
+                                raf.readLong();
+                                break;
+                            case UPDATE_RECORD:
+                                // 此时针对更新记录恢复磁盘文件
+                                Page before = readPageData(raf);
+                                Page after=readPageData(raf);
+                                // 将磁盘中的新页面恢复为旧镜像
+                                Database.getBufferPool().setPage(tid, before.getId(), Permissions.READ_WRITE, after, before);
+                                Database.getBufferPool().flushPages(tid);
+                                break;
                         }
         
                     } catch (EOFException e) {
-                        //e.printStackTrace();
+                        // e.printStackTrace();
                         break;
                     }
                 }
@@ -595,6 +633,7 @@ public class LogFile {
 
         while (true) {
             try {
+                System.out.println("-----RECORD BEGIN-----");
                 int cpType = raf.readInt();
                 long cpTid = raf.readLong();
 
@@ -649,7 +688,9 @@ public class LogFile {
                     System.out.println(raf.getFilePointer() + ": RECORD START OFFSET: " + raf.readLong());
 
                     break;
+                
                 }
+                System.out.println("-----RECORD END-----\n");
 
             } catch (EOFException e) {
                 //e.printStackTrace();
