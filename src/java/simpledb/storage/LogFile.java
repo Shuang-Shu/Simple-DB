@@ -620,68 +620,96 @@ public class LogFile {
                 recoveryUndecided = false;
                 // some code goes here
                 raf.seek(0);
-                Long checkPoint=raf.readLong();
-                Map<Long, Long> uncommittedTid2Offset=new HashMap<>();
-                Long minOffset=Long.MAX_VALUE;// 所有未完成事务中最小的offset
-                if(checkPoint==-1){
-                    // 此时没有checkpoint，需要手动遍历以获取所有未提交事务
-                    try{
-                        while(true){
-                            int type=raf.readInt();
-                            Long tid=raf.readLong();
-                            switch(type){
-                                case BEGIN_RECORD:
-                                    raf.readLong();
-                                    break;
-                                case ABORT_RECORD:
-                                    raf.readLong();
-                                    break;
-                                case COMMIT_RECORD:
-                                    raf.readLong();
-                                    break;
-                                case UPDATE_RECORD:
-                                    
-                            }
-                        }
-                    }catch (EOFException e){
-
-                    }
-                    
-                }else{
-                    // 此时有checkpoint，可以利用checkpoint获取所有未提交事务
-                    raf.seek(checkPoint);
+                Long checkPointOffset=raf.readLong();
+                Set<Long> uncommittedTransactions=new HashSet<>();
+                long startOffset=8;// 扫描开始的offset，如果没有checkpoint则是8；否则是checkpoint后的一个第一个字节位置
+                if(checkPointOffset!=-1){
+                    // 此时有checkpoint
+                    raf.seek(checkPointOffset);
                     raf.readInt();
                     raf.readLong();
-                    int numTransactions = raf.readInt();
-                    while (numTransactions-- > 0) {
-                        Long uncommittedTid=raf.readLong();// tid
-                        Long recordOffset=raf.readLong();
-                        minOffset=Long.min(minOffset, recordOffset);
-                        uncommittedTid2Offset.put(uncommittedTid, recordOffset);
+                    int numTransactions=raf.readInt();
+                    while(numTransactions-->0){
+                        long tid=raf.readLong();
+                        raf.readLong();
+                        uncommittedTransactions.add(tid);
                     }
                     raf.readLong();
+                    startOffset=raf.getFilePointer();
                 }
-                raf.seek(minOffset);
-                // 此时已知所有uncommitted事务的tid
-                for(Long tid:uncommittedTid2Offset.keySet()){
-                    Long transactionOffset=uncommittedTid2Offset.get(tid);
-                    raf.seek(transactionOffset);
-                    raf.readInt();raf.readLong();
-                    // 此时针对更新记录恢复磁盘文件
-                    Page before = readPageData(raf);
-                    Page after=readPageData(raf);
-                    // 将磁盘中的新页面恢复为旧镜像
-                    TransactionId recoverTid=new TransactionId();
+                // 从startOffset开始第一次扫描，检查所有committedTransactions和uncommittedTransactions
+                raf.seek(startOffset);
+                while(true){
                     try{
-                        Database.getBufferPool().setPage(recoverTid, before.getId(), Permissions.READ_WRITE, after, before);
-                        Database.getBufferPool().flushPages(recoverTid);
-                    }catch(Exception e){
-                        e.printStackTrace();
+                        int recordType=raf.readInt();
+                        long recordTid=raf.readLong();
+                        switch(recordType){
+                            case ABORT_RECORD:
+                                // 对于中止事务，将其放入committedTransactions
+                                if(uncommittedTransactions.contains(recordTid))
+                                    uncommittedTransactions.remove(recordTid);
+                                raf.readLong();
+                                break;
+                            case COMMIT_RECORD:
+                                // 对于提交事务，将其放入committedTransactions
+                                if(uncommittedTransactions.contains(recordTid))
+                                    uncommittedTransactions.remove(recordTid);
+                                raf.readLong();
+                                break;
+                            case UPDATE_RECORD:
+                                // 第一次扫描时跳过
+                                readPageData(raf);
+                                readPageData(raf);
+                                raf.readLong();
+                                break;
+                            case BEGIN_RECORD:
+                                // 跳过
+                                raf.readLong();
+                                break;
+                        }
+                    }catch(EOFException e){
+                        break;
                     }
-                    
+                }
+                // 第二次扫描，处理所有页面的redo和undo
+                raf.seek(startOffset);
+                while(true){
+                    try{
+                        int recordType=raf.readInt();
+                        long recordTid=raf.readLong();
+                        switch(recordType){
+                            case ABORT_RECORD:
+                                raf.readLong();
+                                break;
+                            case COMMIT_RECORD:
+                                raf.readLong();
+                                break;
+                            case UPDATE_RECORD:
+                                // 第二次扫描时进行处理
+                                Page before=readPageData(raf);
+                                Page after=readPageData(raf);
+                                TransactionId tid=new TransactionId();
+                                if(uncommittedTransactions.contains(recordTid)){
+                                    // 此时进行undo
+                                    Database.getBufferPool().setPage(tid, before.getId(), Permissions.READ_WRITE, after, before);
+                                }else{
+                                    // 此时进行redo
+                                    Database.getBufferPool().setPage(tid, before.getId(), Permissions.READ_WRITE, after, after);
+                                }
+                                Database.getBufferPool().flushPages(tid);
+                                raf.readLong();
+                                break;
+                            case BEGIN_RECORD:
+                                // 跳过
+                                raf.readLong();
+                                break;
+                        }
+                    }catch(EOFException e){
+                        break;
+                    }
                 }
             }
-         }
+        }
     }
 
     /** Print out a human readable represenation of the log */
