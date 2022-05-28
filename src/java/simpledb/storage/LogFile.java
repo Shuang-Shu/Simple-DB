@@ -619,6 +619,67 @@ public class LogFile {
             synchronized (this) {
                 recoveryUndecided = false;
                 // some code goes here
+                raf.seek(0);
+                Long checkPoint=raf.readLong();
+                Map<Long, Long> uncommittedTid2Offset=new HashMap<>();
+                Long minOffset=Long.MAX_VALUE;// 所有未完成事务中最小的offset
+                if(checkPoint==-1){
+                    // 此时没有checkpoint，需要手动遍历以获取所有未提交事务
+                    try{
+                        while(true){
+                            int type=raf.readInt();
+                            Long tid=raf.readLong();
+                            switch(type){
+                                case BEGIN_RECORD:
+                                    raf.readLong();
+                                    break;
+                                case ABORT_RECORD:
+                                    raf.readLong();
+                                    break;
+                                case COMMIT_RECORD:
+                                    raf.readLong();
+                                    break;
+                                case UPDATE_RECORD:
+                                    
+                            }
+                        }
+                    }catch (EOFException e){
+
+                    }
+                    
+                }else{
+                    // 此时有checkpoint，可以利用checkpoint获取所有未提交事务
+                    raf.seek(checkPoint);
+                    raf.readInt();
+                    raf.readLong();
+                    int numTransactions = raf.readInt();
+                    while (numTransactions-- > 0) {
+                        Long uncommittedTid=raf.readLong();// tid
+                        Long recordOffset=raf.readLong();
+                        minOffset=Long.min(minOffset, recordOffset);
+                        uncommittedTid2Offset.put(uncommittedTid, recordOffset);
+                    }
+                    raf.readLong();
+                }
+                raf.seek(minOffset);
+                // 此时已知所有uncommitted事务的tid
+                for(Long tid:uncommittedTid2Offset.keySet()){
+                    Long transactionOffset=uncommittedTid2Offset.get(tid);
+                    raf.seek(transactionOffset);
+                    raf.readInt();raf.readLong();
+                    // 此时针对更新记录恢复磁盘文件
+                    Page before = readPageData(raf);
+                    Page after=readPageData(raf);
+                    // 将磁盘中的新页面恢复为旧镜像
+                    TransactionId recoverTid=new TransactionId();
+                    try{
+                        Database.getBufferPool().setPage(recoverTid, before.getId(), Permissions.READ_WRITE, after, before);
+                        Database.getBufferPool().flushPages(recoverTid);
+                    }catch(Exception e){
+                        e.printStackTrace();
+                    }
+                    
+                }
             }
          }
     }
