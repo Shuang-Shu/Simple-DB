@@ -3,6 +3,7 @@ package simpledb.storage;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionId;
 import simpledb.common.Debug;
 import simpledb.common.Permissions;
@@ -11,6 +12,7 @@ import java.io.*;
 import java.util.*;
 
 import javax.lang.model.element.Element;
+import javax.swing.TransferHandler.TransferSupport;
 import javax.xml.crypto.Data;
 
 import java.lang.reflect.*;
@@ -619,6 +621,7 @@ public class LogFile {
             synchronized (this) {
                 recoveryUndecided = false;
                 // some code goes here
+                TransactionId recoverId=new TransactionId();
                 raf.seek(0);
                 Long checkPointOffset=raf.readLong();
                 Set<Long> uncommittedTransactions=new HashSet<>();
@@ -663,7 +666,8 @@ public class LogFile {
                                 raf.readLong();
                                 break;
                             case BEGIN_RECORD:
-                                // 跳过
+                                // 对于新的tid，将其放入uncommittedTransactions
+                                uncommittedTransactions.add(recordTid);
                                 raf.readLong();
                                 break;
                         }
@@ -688,15 +692,20 @@ public class LogFile {
                                 // 第二次扫描时进行处理
                                 Page before=readPageData(raf);
                                 Page after=readPageData(raf);
-                                TransactionId tid=new TransactionId();
+
+                                PageId pid=before.getId();
+                                
                                 if(uncommittedTransactions.contains(recordTid)){
                                     // 此时进行undo
-                                    Database.getBufferPool().setPage(tid, before.getId(), Permissions.READ_WRITE, after, before);
+                                    Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, null, before);
                                 }else{
                                     // 此时进行redo
-                                    Database.getBufferPool().setPage(tid, before.getId(), Permissions.READ_WRITE, after, after);
+                                    if(recordType==COMMIT_RECORD)
+                                        Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, null, after);
+                                    else
+                                        Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, null, before);
                                 }
-                                Database.getBufferPool().flushPages(tid);
+                                Database.getBufferPool().flushPages(recoverId);
                                 raf.readLong();
                                 break;
                             case BEGIN_RECORD:
@@ -708,6 +717,7 @@ public class LogFile {
                         break;
                     }
                 }
+                Database.getBufferPool().transactionComplete(recoverId);
             }
         }
     }

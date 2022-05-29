@@ -843,13 +843,29 @@ public class BufferPool {
         int index=-1;
         int count=0;
         for(Page page:bufferPool){
-            if(page.getId().equals(oldPage.getId())){
+            if(page.getId().equals(pid)){
                 index=count;
                 break;
             }
             count++;
         }
-        lockManager.requestLock(tid, bufferPool.get(index).getId(), perm);
+        if(index==-1){
+            try {
+                count=0;
+                getPage(tid, pid, Permissions.READ_WRITE);
+                for(Page page:bufferPool){
+                    if(page.getId().equals(pid)){
+                        index=count;
+                        break;
+                    }
+                    count++;
+                }
+            } catch (DbException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        // lockManager.requestLock(tid, bufferPool.get(index).getId(), perm);
         bufferPool.set(index, newPage);
     }
 
