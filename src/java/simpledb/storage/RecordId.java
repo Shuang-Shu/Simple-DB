@@ -17,14 +17,14 @@ public class RecordId implements Serializable {
      * number.
      * 
      * @param pid
-     *            the pageid of the page on which the tuple resides
+     *                the pageid of the page on which the tuple resides
      * @param tupleno
-     *            the tuple number within the page.
+     *                the tuple number within the page.
      */
     public RecordId(PageId pid, int tupleno) {
         // some code goes here
-        this.pageId=pid;
-        this.tupleNo=tupleno;
+        this.pageId = pid;
+        this.tupleNo = tupleno;
     }
 
     /**
@@ -52,14 +52,14 @@ public class RecordId implements Serializable {
     @Override
     public boolean equals(Object o) {
         // some code goes here
-        if(o==null)
+        if (o == null)
             return false;
-        if(o==this)
+        if (o == this)
             return true;
-        if(o.getClass()!=this.getClass())
+        if (o.getClass() != this.getClass())
             return false;
-        RecordId temp=(RecordId)o;
-        if(temp.getPageId().equals(this.pageId)&&temp.getTupleNumber()==this.tupleNo)
+        RecordId temp = (RecordId) o;
+        if (temp.getPageId().equals(this.pageId) && temp.getTupleNumber() == this.tupleNo)
             return true;
         return false;
     }

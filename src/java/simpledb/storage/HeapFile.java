@@ -2,19 +2,16 @@ package simpledb.storage;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
-import simpledb.common.Debug;
 import simpledb.common.Permissions;
-import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
-import java.awt.image.DataBuffer;
 import java.io.*;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 
 /**
- *  * HeapFile is an implementation of a DbFile that stores a collection of tuples
+ * * HeapFile is an implementation of a DbFile that stores a collection of
+ * tuples
  * in no particular order. Tuples are stored on pages, each of which is a fixed
  * size, and the file is simply a collection of those pages. HeapFile works
  * closely with HeapPage. The format of HeapPages is described in the HeapPage
@@ -30,90 +27,93 @@ import java.util.*;
  */
 public class HeapFile implements DbFile {
 
-    class HeapFileIterator implements DbFileIterator{
-        private int pageNo=0;
-        private Iterator<Tuple> iterator=null;
-        private HeapPage page=null;
-        private int totalPageNumber=0;
-        private boolean isOpen=false;
+    class HeapFileIterator implements DbFileIterator {
+        private int pageIndex = 0;
+        private Iterator<Tuple> iterator = null;
+        private HeapPage page = null;
+        private int totalPageNumber = 0;
+        private boolean open = false;
         private TransactionId transactionId;
 
-        public HeapFileIterator(TransactionId tid){
+        public HeapFileIterator(TransactionId tid) {
             try {
                 // 事务的ID
-                this.transactionId=tid;
-                HeapPageId pid=new HeapPageId(getId(), this.pageNo);
-                this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_WRITE);
-                this.totalPageNumber=(int)(heapFile.length()/Database.getBufferPool().getPageSize());
-                this.iterator=this.page.iterator();
-            }catch (Exception e){
+                this.transactionId = tid;
+                HeapPageId pid = new HeapPageId(getId(), this.pageIndex);
+                this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_WRITE);
+                Database.getBufferPool();
+                this.totalPageNumber = (int) (heapFile.length() / BufferPool.getPageSize());
+                this.iterator = this.page.iterator();
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+
         @Override
         public void open() throws DbException, TransactionAbortedException {
-            this.isOpen=true;
+            this.open = true;
         }
 
         @Override
         public boolean hasNext() throws DbException {
-            if(isOpen==true) {
-                if (iterator.hasNext() == true)
+            if (open) {
+                if (iterator.hasNext()) {
+                    // fast path
                     return true;
-                else {
-                    if (this.pageNo == this.totalPageNumber - 1)
-                        return false;
-                    else {
-                        this.pageNo+=1;
-                        HeapPageId pid=new HeapPageId(getId(), this.pageNo);
-                        this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_ONLY);
-                        this.iterator=this.page.iterator();
-                        return this.hasNext();
+                }
+                for (int i = pageIndex + 1; i < totalPageNumber; i++) {
+                    this.pageIndex = i;
+                    var nxtPageId = new HeapPageId(getId(), this.pageIndex);
+                    this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, nxtPageId,
+                            Permissions.READ_WRITE);
+                    this.iterator = this.page.iterator();
+                    if (this.iterator.hasNext()) {
+                        return true;
                     }
                 }
-            }else
-                return false;
+            }
+            return false;
         }
 
         @Override
         public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
-            if(isOpen==true) {
-                if (this.hasNext() == false)
-                    return null;
-                else {
-                    if (!this.iterator.hasNext()) {
-                        this.pageNo += 1;
-                        HeapPageId pid = new HeapPageId(getId(), this.pageNo);
-                        this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_WRITE);
-                        this.iterator = this.page.iterator();
-                    }
-                    return this.iterator.next();
+            if (open) {
+                if (!this.hasNext()) {
+                    throw new NoSuchElementException();
                 }
-            }else
-                //若尚未open，则应抛出NoSuchElementException
-                throw new NoSuchElementException();
+                if (!this.iterator.hasNext()) {
+                    this.pageIndex += 1;
+                    HeapPageId pid = new HeapPageId(getId(), this.pageIndex);
+                    this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, pid,
+                            Permissions.READ_WRITE);
+                    this.iterator = this.page.iterator();
+                }
+                return this.iterator.next();
+            }
+            // 若尚未open，则应抛出NoSuchElementException
+            throw new NoSuchElementException();
         }
 
         @Override
         public void rewind() throws DbException, TransactionAbortedException {
-            if(isOpen==true){
-                this.pageNo=0;
+            if (open == true) {
+                this.pageIndex = 0;
                 try {
-                    HeapPageId pid=new HeapPageId(getId(), this.pageNo);
-                    this.page=(HeapPage)Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_ONLY);
-                    this.totalPageNumber=(int)(heapFile.length()/Database.getBufferPool().getPageSize());
-                    this.iterator=this.page.iterator();
-                }catch (Exception e){
+                    HeapPageId pid = new HeapPageId(getId(), this.pageIndex);
+                    this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_ONLY);
+                    Database.getBufferPool();
+                    this.totalPageNumber = (int) (heapFile.length() / BufferPool.getPageSize());
+                    this.iterator = this.page.iterator();
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
-            }
-            else
+            } else
                 return;
         }
 
         @Override
         public void close() {
-            this.isOpen=false;
+            this.open = false;
         }
     }
 
@@ -121,14 +121,14 @@ public class HeapFile implements DbFile {
      * Constructs a heap file backed by the specified file.
      * 
      * @param f
-     *            the file that stores the on-disk backing store for this heap
-     *            file.
+     *          the file that stores the on-disk backing store for this heap
+     *          file.
      */
     public HeapFile(File f, TupleDesc td) {
         // some code goes here
         // File类是一个Java.io中的类，代表着一个文件路径的抽象
-        this.heapFile=f;
-        this.tupleDesc=td;
+        this.heapFile = f;
+        this.tupleDesc = td;
     }
 
     /**
@@ -149,6 +149,7 @@ public class HeapFile implements DbFile {
      * file underlying the heapfile, i.e. f.getAbsoluteFile().hashCode().
      *
      * 根据文件路径散列，进而获得File的UniqueID
+     * 
      * @return an ID uniquely identifying this HeapFile.
      */
     public int getId() {
@@ -167,23 +168,22 @@ public class HeapFile implements DbFile {
     }
 
     // see DbFile.java for javadocs
-    public Page readPage(PageId pid) throws IllegalArgumentException{
+    public Page readPage(PageId pid) throws IllegalArgumentException {
+        Database.getBufferPool();
         // some code goes here
-        long offset=pid.getPageNumber()*Database.getBufferPool().getPageSize();
-        int num=this.numPages();
-        if(pid.getPageNumber()>=num)
+        long offset = pid.getPageNumber() * BufferPool.getPageSize();
+        int num = this.numPages();
+        if (pid.getPageNumber() >= num)
             throw new IllegalArgumentException();
-        byte[] buffer=new byte[Database.getBufferPool().getPageSize()];
-        HeapPage result=null;
-        try {
-            RandomAccessFile raf=new RandomAccessFile(this.heapFile, "r");
+        Database.getBufferPool();
+        byte[] buffer = new byte[BufferPool.getPageSize()];
+        HeapPage result = null;
+        try (RandomAccessFile raf = new RandomAccessFile(this.heapFile, "r")) {
             raf.seek(offset);
-            int count=0;
             raf.read(buffer);
-            HeapPage page=new HeapPage((HeapPageId)pid, buffer);
-            result=page;
-        }
-        catch (Exception e) {
+            HeapPage page = new HeapPage((HeapPageId) pid, buffer);
+            result = page;
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return result;
@@ -193,9 +193,10 @@ public class HeapFile implements DbFile {
     public void writePage(Page page) throws IOException {
         // some code goes here
         // not necessary for lab1
-        int pageNo=page.getId().getPageNumber();
-        RandomAccessFile raf=new RandomAccessFile(this.heapFile, "rw");
-        raf.seek(Database.getBufferPool().getPageSize()*pageNo);
+        int pageNo = page.getId().getPageNumber();
+        RandomAccessFile raf = new RandomAccessFile(this.heapFile, "rw");
+        Database.getBufferPool();
+        raf.seek(BufferPool.getPageSize() * pageNo);
         raf.write(page.getPageData());
         raf.close();
     }
@@ -208,8 +209,9 @@ public class HeapFile implements DbFile {
         // 使用file.length()获取file的长度
         // 除已在硬盘中的文件外，还需要考虑BufferPool中可能存在的新建的页面，它们在程序正常运行的情况下将在未来被写入磁盘
         //
-        long fileLength=this.heapFile.length();
-        return (int)(fileLength/Database.getBufferPool().getPageSize());
+        long fileLength = this.heapFile.length();
+        Database.getBufferPool();
+        return (int) (fileLength / BufferPool.getPageSize());
     }
 
     // see DbFile.java for javadocs
@@ -220,69 +222,61 @@ public class HeapFile implements DbFile {
             throws DbException, TransactionAbortedException, IOException {
         // some code goes here
         // not necessary for lab1
-        List<Page> list = new ArrayList<>();
-        int numPages = this.numPages();
-        HeapPage heapPage=null;
+        List<Page> affectedPages = new ArrayList<>();
+        int numPages = numPages();
+        HeapPage heapPage = null;
+        // TODO why bufferPool->HeapFile->bufferPool?
         for (int i = 0; i < numPages; ++i) {
-            // 这里保证了一定找到一个存在的page
-            HeapPageId heapPageId = new HeapPageId(getId(), i);
+            // 这里保证了一定找到一个存在的page？
+            HeapPageId pageId = new HeapPageId(getId(), i);
             // getPage方法需要获取锁
             // 注意，此处的page是磁盘中page在BufferPool中的镜像，而非磁盘中的对象
-            heapPage = ((HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE));
+            heapPage = ((HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE));
             if (heapPage.getNumEmptySlots() > 0) {
-                heapPage.insertTuple(t);
-                list.add(heapPage);
-                return list;
-            }else{
+                synchronized (heapPage) {
+                    // double check lock
+                    if (heapPage.getNumEmptySlots() > 0) {
+                        heapPage.insertTuple(t);
+                    } else {
+                        continue;
+                    }
+                }
+                affectedPages.add(heapPage);
+                return affectedPages;
+            } else {
                 // 若该page中没有空的槽位，直接释放这个page上的锁
-                // 此时放弃锁并不满足2PL原则，但此时释放锁不会影响结果，同时还能够提高并发度
-                Database.getBufferPool().unsafeReleasePage(tid, heapPageId);
+                // 根据2PL协议，应当在事务提交时才释放锁；此处由于没有操作page，可以提前释放锁以提高并发度
+                Database.getBufferPool().unsafeReleasePage(tid, pageId);
             }
         }
-        // 若均空，则需要新建page，这里新建的page应该在bufferpool中新建，而非直接在HeapFile的物理存储中新建
-        // 这里新建Page的工作在BufferPool.getPage()的catch块中完成
-        // 此时需要考虑并发问题，因为可能有其它的事务也在新建page（后续Lab的内容）
+        // need an empty page from buffer pool
         /*
-        *   并发的可能性：
-        *       1. 没有其它事务（线程）新建Page，此时本线程能通过BufferPool直接新建Page并插入tuple
-        *       2. 有其它线程新建Page，但Page未满，此时本线程获取的是其它线程修改完成的Page，直接插入
-        *       3. 有其它线程新建Page，且Page已满，
-        *
-        * */
-        if(list.size()==0){
-            synchronized (Database.getBufferPool()){
-                // 锁定BufferPool，防止被修改
-                // 检查别的事务是否已经新建了该page
-                HeapPageId heapPageId = new HeapPageId(getId(), numPages);
-                HeapPage newPage= (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE);
+         * 并发的可能性：
+         * 1. 没有其它事务（线程）新建Page，此时本线程能通过BufferPool直接新建Page并插入tuple
+         * 2. 有其它线程新建Page，但Page未满，此时本线程获取的是其它线程修改完成的Page，直接插入
+         * 3. 有其它线程新建Page，且Page已满，
+         *
+         */
+        if (affectedPages.size() == 0) {
+            synchronized (Database.getBufferPool()) {
+                // double check
+                HeapPageId heapPageId = new HeapPageId(getId(), numPages); // new tail page id
+                HeapPage newPage = (HeapPage) Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE);
                 newPage.insertTuple(t);
-                list.add(newPage);
-                return list;
-//                if(Database.getBufferPool().getPage(tid, heapPageId, Permissions.READ_WRITE)==null){
-//                    // 这个条件目前不可能达成，因为getPage必定会返回一个结果
-//                    // 其它事务尚未新建Page
-//                    try {
-//                        heapPage=new HeapPage(heapPageId, HeapPage.createEmptyPageData());
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                    }
-//                    // 将tuple插入heapPage
-//                    heapPage.insertTuple(t);
-//                }else{
-//                    this.insertTuple(tid, t);
-//                }
+                affectedPages.add(newPage);
+                return affectedPages;
             }
         }
-        list.add(heapPage);
-        return list;
+        return affectedPages;
     }
 
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
-        ArrayList<Page> list=new ArrayList<>();
-        HeapPage heapPage=(HeapPage) Database.getBufferPool().getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
+        ArrayList<Page> list = new ArrayList<>();
+        HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid, t.getRecordId().getPageId(),
+                Permissions.READ_WRITE);
         heapPage.deleteTuple(t);
         list.add(heapPage);
         return list;
@@ -297,4 +291,3 @@ public class HeapFile implements DbFile {
     private File heapFile;
     private TupleDesc tupleDesc;
 }
-

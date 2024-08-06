@@ -20,29 +20,27 @@ public class Join extends Operator {
      * on
      * 
      * @param p
-     *            The predicate to use to join the children
+     *               The predicate to use to join the children
      * @param child1
-     *            Iterator for the left(outer) relation to join
+     *               Iterator for the left(outer) relation to join
      * @param child2
-     *            Iterator for the right(inner) relation to join
+     *               Iterator for the right(inner) relation to join
      */
     private JoinPredicate joinPredicate;
     private OpIterator opIterator1;
     private OpIterator opIterator2;
-    private TupleDesc newTupleDesc;
     private Tuple tempTuple1;
 
-    public Join(JoinPredicate p, OpIterator child1, OpIterator child2){
+    public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
         // some code goes here
-        this.joinPredicate=p;
-        this.opIterator1=child1;
-        this.opIterator2=child2;
-        this.newTupleDesc=this.getTupleDesc();
+        this.joinPredicate = p;
+        this.opIterator1 = child1;
+        this.opIterator2 = child2;
         try {
             this.opIterator1.open();
             this.tempTuple1 = this.opIterator1.next();
             this.opIterator1.close();
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -54,9 +52,9 @@ public class Join extends Operator {
 
     /**
      * @return
-     *       the field name of join field1. Should be quantified by
-     *       alias or table name.
-     * */
+     *         the field name of join field1. Should be quantified by
+     *         alias or table name.
+     */
     public String getJoinField1Name() {
         // some code goes here
         return null;
@@ -64,9 +62,9 @@ public class Join extends Operator {
 
     /**
      * @return
-     *       the field name of join field2. Should be quantified by
-     *       alias or table name.
-     * */
+     *         the field name of join field2. Should be quantified by
+     *         alias or table name.
+     */
     public String getJoinField2Name() {
         // some code goes here
         return null;
@@ -78,8 +76,8 @@ public class Join extends Operator {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        TupleDesc temp1=this.opIterator1.getTupleDesc();
-        TupleDesc temp2=this.opIterator2.getTupleDesc();
+        TupleDesc temp1 = this.opIterator1.getTupleDesc();
+        TupleDesc temp2 = this.opIterator2.getTupleDesc();
         return TupleDesc.merge(temp1, temp2);
     }
 
@@ -125,36 +123,38 @@ public class Join extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
-        //此处使用嵌套循环实现
+        // 此处使用嵌套循环实现
         Tuple tuple2;
-        while(true){
-            while (this.opIterator2.hasNext()){
-                tuple2=this.opIterator2.next();
-                if(this.joinPredicate.filter(this.tempTuple1, tuple2)){
+        while (true) {
+            while (this.opIterator2.hasNext()) {
+                tuple2 = this.opIterator2.next();
+                if (this.joinPredicate.filter(this.tempTuple1, tuple2)) {
                     return this.join(this.tempTuple1, tuple2);
-                }else
+                } else
                     continue;
             }
-            if(this.opIterator1.hasNext())
-                this.tempTuple1=this.opIterator1.next();
+            if (this.opIterator1.hasNext())
+                this.tempTuple1 = this.opIterator1.next();
             else
                 break;
             this.opIterator2.rewind();
         }
         return null;
     }
-    protected Tuple join(Tuple t1, Tuple t2){
-        TupleDesc td=this.getTupleDesc();
-        Tuple result=new Tuple(td);
-        int idx=0;
-        Iterator<Field> iterator1=t1.fields();
-        Iterator<Field> iterator2=t2.fields();
+
+    protected Tuple join(Tuple t1, Tuple t2) {
+        TupleDesc td = this.getTupleDesc();
+        Tuple result = new Tuple(td);
+        int idx = 0;
+        Iterator<Field> iterator1 = t1.fields();
+        Iterator<Field> iterator2 = t2.fields();
         while (iterator1.hasNext())
             result.setField(idx++, iterator1.next());
         while (iterator2.hasNext())
             result.setField(idx++, iterator2.next());
         return result;
     }
+
     @Override
     public OpIterator[] getChildren() {
         // some code goes here

@@ -1,10 +1,7 @@
 package simpledb.storage;
 
-import simpledb.common.Type;
-
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 
 /**
@@ -17,19 +14,24 @@ public class Tuple implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    private TupleDesc tupleDesc = null;
+    private ArrayList<Field> fields;
+    private RecordId recordId;
+
     /**
      * Create a new tuple with the specified schema (type).
-     *用指定的模式（类型）创建一个新元组。
+     * 用指定的模式（类型）创建一个新元组。
+     * 
      * @param td
-     *            the schema of this tuple. It must be a valid TupleDesc
-     *            instance with at least one field.
-     *            这个元组的模式。它必须是一个有效的TupleDesc实例，至少有一个字段。
+     *           the schema of this tuple. It must be a valid TupleDesc
+     *           instance with at least one field.
+     *           这个元组的模式。它必须是一个有效的TupleDesc实例，至少有一个字段。
      */
     public Tuple(TupleDesc td) {
         // some code goes here
-        this.tupleDesc=td;
-        this.fields=new ArrayList<>();
-        for(int i=0;i<td.numFields();++i)
+        this.tupleDesc = td;
+        this.fields = new ArrayList<>();
+        for (int i = 0; i < td.numFields(); ++i)
             this.fields.add(null);
     }
 
@@ -55,25 +57,26 @@ public class Tuple implements Serializable {
     /**
      * Set the RecordId information for this tuple.
      * 暂时做不了
+     * 
      * @param rid
      *            the new RecordId for this tuple.
      */
     public void setRecordId(RecordId rid) {
         // some code goes here
-        this.recordId=rid;
+        this.recordId = rid;
     }
 
     /**
      * Change the value of the ith field of this tuple.
      *
      * @param i
-     *            index of the field to change. It must be a valid index.
+     *          index of the field to change. It must be a valid index.
      * @param f
-     *            new value for the field.
+     *          new value for the field.
      */
     public void setField(int i, Field f) {
         // some code goes here
-        if(i>=0&&i<this.fields.size())
+        if (i >= 0 && i < this.fields.size())
             this.fields.set(i, f);
     }
 
@@ -81,10 +84,10 @@ public class Tuple implements Serializable {
      * @return the value of the ith field, or null if it has not been set.
      *
      * @param i
-     *            field index to return. Must be a valid index.
+     *          field index to return. Must be a valid index.
      */
     public Field getField(int i) {
-        if(i>=0&&i<this.fields.size())
+        if (i >= 0 && i < this.fields.size())
             return this.fields.get(i);
         else
             return null;
@@ -100,8 +103,8 @@ public class Tuple implements Serializable {
      */
     public String toString() {
         // some code goes here
-        StringBuilder result= new StringBuilder();
-        Iterator<Field> iterator=this.fields();
+        StringBuilder result = new StringBuilder();
+        Iterator<Field> iterator = this.fields();
         while (iterator.hasNext())
             result.append(iterator.next().toString()).append("\t");
         return result.toString();
@@ -109,28 +112,22 @@ public class Tuple implements Serializable {
 
     /**
      * @return
-     *        An iterator which iterates over all the fields of this tuple
-     * */
-    public Iterator<Field> fields()
-    {
+     *         An iterator which iterates over all the fields of this tuple
+     */
+    public Iterator<Field> fields() {
         // some code goes here
         return this.fields.iterator();
     }
 
     /**
      * reset the TupleDesc of this tuple (only affecting the TupleDesc)
-     * */
-    public void resetTupleDesc(TupleDesc td)
-    {
+     */
+    public void resetTupleDesc(TupleDesc td) {
         // some code goes here
-        this.tupleDesc=td;
-        ArrayList<Field> newFields=new ArrayList<>(td.numFields());
-        for(int i=0;i<this.fields.size();++i)
+        this.tupleDesc = td;
+        ArrayList<Field> newFields = new ArrayList<>(td.numFields());
+        for (int i = 0; i < this.fields.size(); ++i)
             newFields.set(i, this.fields.get(i));
-        this.fields=newFields;
+        this.fields = newFields;
     }
-
-    private TupleDesc tupleDesc=null;
-    private ArrayList<Field> fields;
-    private RecordId recordId;
 }

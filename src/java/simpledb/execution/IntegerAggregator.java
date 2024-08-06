@@ -8,7 +8,6 @@ import simpledb.transaction.TransactionAbortedException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 /**
  * Knows how to compute some aggregate over a set of IntFields.
@@ -21,15 +20,16 @@ public class IntegerAggregator implements Aggregator {
      * Aggregate constructor
      * 
      * @param gbfield
-     *            the 0-based index of the group-by field in the tuple, or
-     *            NO_GROUPING if there is no grouping
+     *                    the 0-based index of the group-by field in the tuple, or
+     *                    NO_GROUPING if there is no grouping
      * @param gbfieldtype
-     *            the type of the group by field (e.g., Type.INT_TYPE), or null
-     *            if there is no grouping
+     *                    the type of the group by field (e.g., Type.INT_TYPE), or
+     *                    null
+     *                    if there is no grouping
      * @param afield
-     *            the 0-based index of the aggregate field in the tuple
+     *                    the 0-based index of the aggregate field in the tuple
      * @param what
-     *            the aggregation operator
+     *                    the aggregation operator
      */
 
     private int groupField;
@@ -42,18 +42,17 @@ public class IntegerAggregator implements Aggregator {
 
     public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
         // some code goes here
-        this.groupField=gbfield;
-        this.groupFieldType=gbfieldtype;
-        this.aggregateFiled=afield;
-        this.op=what;
-        map=new HashMap<>();
+        this.groupField = gbfield;
+        this.groupFieldType = gbfieldtype;
+        this.aggregateFiled = afield;
+        this.op = what;
+        map = new HashMap<>();
         if (this.op == Op.AVG) {
             countMap = new HashMap<>();
-            sumMap=new HashMap<>();
-        }
-        else {
+            sumMap = new HashMap<>();
+        } else {
             countMap = null;
-            sumMap=new HashMap<>();
+            sumMap = new HashMap<>();
         }
     }
 
@@ -66,17 +65,17 @@ public class IntegerAggregator implements Aggregator {
      */
     public void mergeTupleIntoGroup(Tuple tup) {
         // some code goes here
-        Object key=null;
-        Object field=null;
-        if(this.groupField!=NO_GROUPING) {
+        Object key = null;
+        Object field = null;
+        if (groupField != NO_GROUPING) {
             field = (tup.getField(groupField));
-            if (field instanceof IntField)
+            if (field instanceof IntField) {
                 key = ((IntField) field).getValue();
-            else
+            } else {
                 key = ((StringField) field).getValue();
-        }else {
-            key="_NO_GROUPING";
-            //field=Type.INT_TYPE;
+            }
+        } else {
+            key = "_NO_GROUPING";
         }
         int value = ((IntField) (tup.getField(aggregateFiled))).getValue();
 
@@ -104,26 +103,26 @@ public class IntegerAggregator implements Aggregator {
                 break;
             case AVG:
                 if (this.map.containsKey(key)) {
-                    int newSum=this.sumMap.get(key)+value;
-                    int newAvg = newSum/ (this.countMap.get(key) + 1);
+                    int newSum = this.sumMap.get(key) + value;
+                    int newAvg = newSum / (this.countMap.get(key) + 1);
                     this.map.put(key, newAvg);
                     this.sumMap.put(key, newSum);
                     this.countMap.put(key, this.countMap.get(key) + 1);
-                    } else {
-                        this.map.put(key, value);
-                        this.sumMap.put(key, value);
-                        this.countMap.put(key, 1);
-                    }
-                    break;
-                case COUNT:
-                    if (this.map.containsKey(key)) {
-                        this.map.put(key, map.get(key) + 1);
-                    } else {
-                        this.map.put(key, 1);
-                    }
-                    break;
+                } else {
+                    this.map.put(key, value);
+                    this.sumMap.put(key, value);
+                    this.countMap.put(key, 1);
                 }
+                break;
+            case COUNT:
+                if (this.map.containsKey(key)) {
+                    this.map.put(key, map.get(key) + 1);
+                } else {
+                    this.map.put(key, 1);
+                }
+                break;
         }
+    }
 
     /**
      * Create a OpIterator over group aggregate results.
@@ -133,15 +132,17 @@ public class IntegerAggregator implements Aggregator {
      *         aggregateVal is determined by the type of aggregate specified in
      *         the constructor.
      */
-    class IntegerAggregateorIterator implements OpIterator{
-        private boolean isOpen=false;
+    class IntegerAggregateorIterator implements OpIterator {
+        private boolean isOpen = false;
         private Iterator<Map.Entry<Object, Integer>> iterator;
-        public IntegerAggregateorIterator(){
-            iterator=map.entrySet().iterator();
+
+        public IntegerAggregateorIterator() {
+            iterator = map.entrySet().iterator();
         }
+
         @Override
         public void open() throws DbException, TransactionAbortedException {
-            this.isOpen=true;
+            this.isOpen = true;
         }
 
         @Override
@@ -151,11 +152,11 @@ public class IntegerAggregator implements Aggregator {
 
         @Override
         public Tuple next() throws DbException, TransactionAbortedException, IllegalStateException {
-            if(this.isOpen==false)
+            if (this.isOpen == false)
                 throw new IllegalStateException();
-            Map.Entry<Object, Integer> entry=this.iterator.next();
-            if(groupField!=NO_GROUPING) {
-                Type[] temp = {groupFieldType, Type.INT_TYPE};
+            Map.Entry<Object, Integer> entry = this.iterator.next();
+            if (groupField != NO_GROUPING) {
+                Type[] temp = { groupFieldType, Type.INT_TYPE };
                 TupleDesc td = new TupleDesc(temp);
                 Tuple result = new Tuple(td);
                 Field field1 = null;
@@ -169,11 +170,11 @@ public class IntegerAggregator implements Aggregator {
                 result.setField(0, field1);
                 result.setField(1, field2);
                 return result;
-            }else{
-                Type[] temp={Type.INT_TYPE};
-                TupleDesc td=new TupleDesc(temp);
-                Tuple result=new Tuple(td);
-                Field field=new IntField(entry.getValue());
+            } else {
+                Type[] temp = { Type.INT_TYPE };
+                TupleDesc td = new TupleDesc(temp);
+                Tuple result = new Tuple(td);
+                Field field = new IntField(entry.getValue());
                 result.setField(0, field);
                 return result;
             }
@@ -181,23 +182,24 @@ public class IntegerAggregator implements Aggregator {
 
         @Override
         public void rewind() throws DbException, TransactionAbortedException {
-            if(isOpen==false)
+            if (isOpen == false)
                 throw new IllegalStateException();
-            this.iterator=map.entrySet().iterator();
+            this.iterator = map.entrySet().iterator();
         }
 
         @Override
         public TupleDesc getTupleDesc() {
-            Type[] temp={groupFieldType, Type.INT_TYPE};
-            TupleDesc td=new TupleDesc(temp);
+            Type[] temp = { groupFieldType, Type.INT_TYPE };
+            TupleDesc td = new TupleDesc(temp);
             return td;
         }
 
         @Override
         public void close() {
-            this.isOpen=false;
+            this.isOpen = false;
         }
     }
+
     public OpIterator iterator() {
         // some code goes here
         return new IntegerAggregateorIterator();

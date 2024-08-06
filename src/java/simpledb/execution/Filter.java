@@ -5,7 +5,6 @@ import simpledb.common.DbException;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 
-import javax.swing.*;
 import java.util.*;
 
 /**
@@ -20,9 +19,9 @@ public class Filter extends Operator {
      * tuples to filter from.
      * 
      * @param p
-     *            The predicate to filter tuples with
+     *              The predicate to filter tuples with
      * @param child
-     *            The child operator
+     *              The child operator
      */
 
     private Predicate predicate;
@@ -30,8 +29,8 @@ public class Filter extends Operator {
 
     public Filter(Predicate p, OpIterator child) {
         // some code goes here
-        this.predicate=p;
-        this.opIterator=child;
+        this.predicate = p;
+        this.opIterator = child;
     }
 
     public Predicate getPredicate() {
@@ -78,9 +77,9 @@ public class Filter extends Operator {
             TransactionAbortedException, DbException {
         // some code goes here
         Tuple temp;
-        while (this.opIterator.hasNext()){
-            temp=this.opIterator.next();
-            if(this.predicate.filter(temp))
+        while (this.opIterator.hasNext()) {
+            temp = this.opIterator.next();
+            if (this.predicate.filter(temp))
                 return temp;
             else
                 continue;

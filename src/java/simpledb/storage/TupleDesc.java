@@ -13,34 +13,37 @@ public class TupleDesc implements Serializable {
     /**
      * A help class to facilitate organizing the information of each field
      * 一个帮助类，便于组织每个域的信息
-     * */
+     */
     public static class TDItem implements Serializable {
         /*
-        * 一个内部类，用于描述某一个Tuple属性的属性（即域名和域类型）
-        *
-        * */
+         * 一个内部类，用于描述某一个Tuple属性的属性（即域名和域类型）
+         *
+         */
         private static final long serialVersionUID = 1L;
 
         /**
          * The type of the field
-         * */
+         */
         public final Type fieldType;
-        
+
         /**
          * The name of the field
-         * */
+         */
         public final String fieldName;
 
         public TDItem(Type t, String n) {
             this.fieldName = n;
             this.fieldType = t;
         }
-        public String getFieldName(){
+
+        public String getFieldName() {
             return this.fieldName;
         }
-        public Type getFieldType(){
+
+        public Type getFieldType() {
             return this.fieldType;
         }
+
         public String toString() {
             return fieldName + "(" + fieldType + ")";
         }
@@ -48,10 +51,10 @@ public class TupleDesc implements Serializable {
 
     /**
      * @return
-     *        一个返回Iterator<TDItem> 的函数，用以迭代整个TupleDesc
-     *        An iterator which iterates over all the field TDItems
-     *        that are included in this TupleDesc
-     * */
+     *         一个返回Iterator<TDItem> 的函数，用以迭代整个TupleDesc
+     *         An iterator which iterates over all the field TDItems
+     *         that are included in this TupleDesc
+     */
     public Iterator<TDItem> iterator() {
         // some code goes here
         return this.TdList.iterator();
@@ -65,18 +68,19 @@ public class TupleDesc implements Serializable {
      * 有typeAr和fieldAr作为参数的构造函数
      *
      * 用typeAr(ray).length字段创建一个新的TupleDesc，其中有指定类型的字段，有相关的命名字段。
+     * 
      * @param typeAr
-     *            array specifying the number of and types of fields in this
-     *            TupleDesc. It must contain at least one entry.
+     *                array specifying the number of and types of fields in this
+     *                TupleDesc. It must contain at least one entry.
      * @param fieldAr
-     *            array specifying the names of the fields.
+     *                array specifying the names of the fields.
      *
-     *            Note that names may be null.
+     *                Note that names may be null.
      */
     public TupleDesc(Type[] typeAr, String[] fieldAr) {
         // some code goes here_OK
-        this.TdList=new ArrayList<>();
-        for(int i=0;i<typeAr.length;++i)
+        this.TdList = new ArrayList<>();
+        for (int i = 0; i < typeAr.length; ++i)
             this.TdList.add(new TDItem(typeAr[i], fieldAr[i]));
     }
 
@@ -86,13 +90,14 @@ public class TupleDesc implements Serializable {
      * 仅有typeAr的为参数的构造函数
      *
      * @param typeAr
-     *            array specifying the number of and types of fields in this
-     *            TupleDesc. It must contain at least one entry.
+     *               array specifying the number of and types of fields in this
+     *               TupleDesc. It must contain at least one entry.
      */
     public TupleDesc(Type[] typeAr) {
         // some code goes here
-        this.TdList=new ArrayList<>();
-        for (Type type : typeAr) this.TdList.add(new TDItem(type, null));
+        this.TdList = new ArrayList<>();
+        for (Type type : typeAr)
+            this.TdList.add(new TDItem(type, null));
     }
 
     /**
@@ -107,10 +112,10 @@ public class TupleDesc implements Serializable {
      * Gets the (possibly null) field name of the ith field of this TupleDesc.
      * 
      * @param i
-     *            index of the field name to return. It must be a valid index.
+     *          index of the field name to return. It must be a valid index.
      * @return the name of the ith field
      * @throws NoSuchElementException
-     *             if i is not a valid field reference.
+     *                                if i is not a valid field reference.
      */
     public String getFieldName(int i) throws NoSuchElementException {
         // some code goes here
@@ -121,11 +126,11 @@ public class TupleDesc implements Serializable {
      * Gets the type of the ith field of this TupleDesc.
      * 
      * @param i
-     *            The index of the field to get the type of. It must be a valid
-     *            index.
+     *          The index of the field to get the type of. It must be a valid
+     *          index.
      * @return the type of the ith field
      * @throws NoSuchElementException
-     *             if i is not a valid field reference.
+     *                                if i is not a valid field reference.
      */
     public Type getFieldType(int i) throws NoSuchElementException {
         // some code goes here
@@ -136,16 +141,16 @@ public class TupleDesc implements Serializable {
      * Find the index of the field with a given name.
      * 
      * @param name
-     *            name of the field.
+     *             name of the field.
      * @return the index of the field that is first to have the given name.
      * @throws NoSuchElementException
-     *             if no field with a matching name is found.
+     *                                if no field with a matching name is found.
      */
     public int fieldNameToIndex(String name) throws NoSuchElementException {
-        Iterator<TDItem> iterator=this.iterator();
-        int i=0;
-        while (iterator.hasNext()){
-            if(Objects.equals(iterator.next().fieldName, name))
+        Iterator<TDItem> iterator = this.iterator();
+        int i = 0;
+        while (iterator.hasNext()) {
+            if (Objects.equals(iterator.next().fieldName, name))
                 return i;
             i++;
         }
@@ -158,10 +163,10 @@ public class TupleDesc implements Serializable {
      */
     public int getSize() {
         // some code goes here
-        int size=0;
-        Iterator<TDItem> iter=this.iterator();
+        int size = 0;
+        Iterator<TDItem> iter = this.iterator();
         while (iter.hasNext())
-            size+=iter.next().fieldType.getLen();
+            size += iter.next().fieldType.getLen();
         return size;
     }
 
@@ -177,17 +182,17 @@ public class TupleDesc implements Serializable {
      */
     public static TupleDesc merge(TupleDesc td1, TupleDesc td2) {
         // some code goes here
-        int size1= td1.numFields();
-        int size2= td2.numFields();
-        String [] tempName=new String[size1+size2];
-        Type[] tempType=new Type[size1+size2];
-        for(int i=0;i<size1;++i) {
+        int size1 = td1.numFields();
+        int size2 = td2.numFields();
+        String[] tempName = new String[size1 + size2];
+        Type[] tempType = new Type[size1 + size2];
+        for (int i = 0; i < size1; ++i) {
             tempName[i] = td1.TdList.get(i).fieldName;
-            tempType[i]= td1.TdList.get(i).fieldType;
+            tempType[i] = td1.TdList.get(i).fieldType;
         }
-        for(int i=size1;i<size1+size2;++i){
-            tempName[i] = td2.TdList.get(i-size1).fieldName;
-            tempType[i]= td2.TdList.get(i-size1).fieldType;
+        for (int i = size1; i < size1 + size2; ++i) {
+            tempName[i] = td2.TdList.get(i - size1).fieldName;
+            tempType[i] = td2.TdList.get(i - size1).fieldType;
         }
         return new TupleDesc(tempType, tempName);
     }
@@ -199,28 +204,28 @@ public class TupleDesc implements Serializable {
      * for every i.
      * 
      * @param o
-     *            the Object to be compared for equality with this TupleDesc.
+     *          the Object to be compared for equality with this TupleDesc.
      * @return true if the object is equal to this TupleDesc.
      */
 
     public boolean equals(Object o) {
         // some code goes here
-        if(o==this)
-            //若o为这个对象本身的的引用
+        if (o == this)
+            // 若o为这个对象本身的的引用
             return true;
-        if(!(o instanceof TupleDesc))
+        if (!(o instanceof TupleDesc))
             return false;
-        TupleDesc temp=(TupleDesc)o;
-        if(this.numFields()!=temp.numFields())
+        TupleDesc temp = (TupleDesc) o;
+        if (this.numFields() != temp.numFields())
             return false;
 
-        Iterator<TDItem> iterator1=this.iterator();
-        Iterator<TDItem> iterator2=temp.iterator();
+        Iterator<TDItem> iterator1 = this.iterator();
+        Iterator<TDItem> iterator2 = temp.iterator();
 
-        while (iterator1.hasNext()){
-            TDItem temp1=iterator1.next();
-            TDItem temp2=iterator2.next();
-            if(temp1.fieldType!=temp2.fieldType|| !Objects.equals(temp1.fieldName, temp2.fieldName))
+        while (iterator1.hasNext()) {
+            TDItem temp1 = iterator1.next();
+            TDItem temp2 = iterator2.next();
+            if (temp1.fieldType != temp2.fieldType || !Objects.equals(temp1.fieldName, temp2.fieldName))
                 return false;
         }
         return true;
@@ -241,12 +246,13 @@ public class TupleDesc implements Serializable {
      */
     public String toString() {
         // some code goes here
-        StringBuilder result= new StringBuilder();
-        for(int i=0;i<this.TdList.size()-1;++i)
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < this.TdList.size() - 1; ++i)
             result.append(this.TdList.get(i).toString()).append(",");
         result.append(this.TdList.get(this.TdList.size() - 1).toString());
         return result.toString();
     }
-    //Tuple类域，一个TdItem的array
+
+    // Tuple类域，一个TdItem的array
     private final ArrayList<TDItem> TdList;
 }

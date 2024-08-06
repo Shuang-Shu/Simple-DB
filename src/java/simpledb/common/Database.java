@@ -58,7 +58,7 @@ public class Database {
      * return it
      */
     public static BufferPool resetBufferPool(int pages) {
-        java.lang.reflect.Field bufferPoolF=null;
+        java.lang.reflect.Field bufferPoolF = null;
         try {
             bufferPoolF = Database.class.getDeclaredField("_bufferpool");
             bufferPoolF.setAccessible(true);
@@ -66,7 +66,7 @@ public class Database {
         } catch (NoSuchFieldException | IllegalAccessException | IllegalArgumentException | SecurityException e) {
             e.printStackTrace();
         }
-//        _instance._bufferpool = new BufferPool(pages);
+        // _instance._bufferpool = new BufferPool(pages);
         return _instance.get()._bufferpool;
     }
 
