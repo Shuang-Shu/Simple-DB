@@ -8,20 +8,24 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class TransactionId implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    static final AtomicLong counter = new AtomicLong(0);
-    final long myid;
+	static final AtomicLong counter = new AtomicLong(0);
+	final long id;
 
-    public TransactionId() {
-        myid = counter.getAndIncrement();
-    }
+	public TransactionId() {
+		id = counter.getAndIncrement();
+	}
 
-    public long getId() {
-        return myid;
-    }
+	public TransactionId(long id) {
+		this.id = id;
+	}
 
-    @Override
+	public long getId() {
+		return id;
+	}
+
+	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
 			return true;
@@ -30,14 +34,14 @@ public class TransactionId implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		TransactionId other = (TransactionId) obj;
-        return myid == other.myid;
-    }
+		return id == other.id;
+	}
 
-    @Override
+	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + (int) (myid ^ (myid >>> 32));
+		result = prime * result + (int) (id ^ (id >>> 32));
 		return result;
 	}
 }

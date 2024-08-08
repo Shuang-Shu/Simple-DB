@@ -19,7 +19,7 @@ public class TableStats {
 
     private static final ConcurrentMap<String, TableStats> statsMap = new ConcurrentHashMap<>();
 
-    static final int IOCOSTPERPAGE = 1000;
+    static final int IO_COST_PER_PAGE = 1000;
 
     public static TableStats getTableStats(String tablename) {
         return statsMap.get(tablename);
@@ -42,7 +42,6 @@ public class TableStats {
 
     private DbFile dbFile;
     private IntHistogram[] intHistogram;
-    private int tableId;
     private int[] max;
     private int[] min;
     private boolean[] isIntField;
@@ -59,7 +58,7 @@ public class TableStats {
         System.out.println("Computing table stats.");
         while (tableIt.hasNext()) {
             int tableid = tableIt.next();
-            TableStats s = new TableStats(tableid, IOCOSTPERPAGE);
+            TableStats s = new TableStats(tableid, IO_COST_PER_PAGE);
             setTableStats(Database.getCatalog().getTableName(tableid), s);
         }
         System.out.println("Done.");
@@ -93,7 +92,6 @@ public class TableStats {
         // in a single scan of the table.
         // some code goes here
         this.ioCostPerPage = ioCostPerPage;
-        this.tableId = tableid;
         this.dbFile = Database.getCatalog().getDatabaseFile(tableid);
         TupleDesc tempTd = this.dbFile.getTupleDesc();
         this.min = new int[tempTd.numFields()];
@@ -112,32 +110,34 @@ public class TableStats {
             tupleIterator.open();
             while (tupleIterator.hasNext()) {
                 this.totalTups += 1;
-                Tuple temp = tupleIterator.next();
-                TupleDesc td = temp.getTupleDesc();
+                Tuple tuple = tupleIterator.next();
+                TupleDesc td = tuple.getTupleDesc();
                 for (int i = 0; i < td.numFields(); ++i) {
                     if (this.isIntField[i]) {
-                        int tempValue = ((IntField) temp.getField(i)).getValue();
-                        this.min[i] = Math.min(this.min[i], tempValue);
-                        this.max[i] = Math.max(this.max[i], tempValue);
+                        int intFieldVal = ((IntField) tuple.getField(i)).getValue();
+                        this.min[i] = Math.min(this.min[i], intFieldVal);
+                        this.max[i] = Math.max(this.max[i], intFieldVal);
                     }
                 }
             }
             tupleIterator.rewind();
             for (int i = 0; i < this.dbFile.getTupleDesc().numFields(); ++i) {
-                if (this.isIntField[i])
-                    this.intHistogram[i] = new IntHistogram(this.NUM_HIST_BINS, this.min[i], this.max[i]);
+                if (this.isIntField[i]) {
+                    this.intHistogram[i] = new IntHistogram(NUM_HIST_BINS, this.min[i], this.max[i]);
+                }
             }
             while (tupleIterator.hasNext()) {
-                Tuple temp = tupleIterator.next();
-                TupleDesc td = temp.getTupleDesc();
+                Tuple tuple = tupleIterator.next();
+                TupleDesc td = tuple.getTupleDesc();
                 for (int i = 0; i < td.numFields(); ++i) {
-                    if (isIntField[i])
-                        this.intHistogram[i].addValue(((IntField) temp.getField(i)).getValue());
+                    if (isIntField[i]) {
+                        this.intHistogram[i].addValue(((IntField) tuple.getField(i)).getValue());
+                    }
                 }
             }
             tupleIterator.close();
         } catch (Exception e) {
-            System.out.println("tupleIterator错误");
+            System.out.println("tupleIterator error: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -156,7 +156,7 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // some code goes here
-        int pageNum = (int) (((HeapFile) this.dbFile).getFile().length() / Database.getBufferPool().getPageSize());
+        int pageNum = (int) (((HeapFile) this.dbFile).getFile().length() / BufferPool.getPageSize());
         return pageNum * this.ioCostPerPage;
     }
 
@@ -178,8 +178,6 @@ public class TableStats {
             }
         }
         return (int) (ntups * selectivityFactor);
-        // return
-        // (int)(selectivityFactor*(((HeapFile)this.dbFile).getFile().length())/Database.getCatalog().getTupleDesc(this.tableId).getSize());
     }
 
     /**
@@ -216,7 +214,14 @@ public class TableStats {
      */
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
         // some code goes here
-        return this.intHistogram[field].estimateSelectivity(op, ((IntField) constant).getValue());
+        switch (constant.getType()) {
+            case STRING_TYPE:
+                return 1.0;
+            case INT_TYPE:
+                return this.intHistogram[field].estimateSelectivity(op, ((IntField) constant).getValue());
+            default:
+                return 1.0;
+        }
     }
 
     /**

@@ -58,7 +58,8 @@ public class HeapPage implements Page {
     TransactionId tid;
 
     byte[] oldData;
-    private final Byte oldDataLock = (byte) 0;
+    @SuppressWarnings("removal")
+    private final Byte oldDataLock = new Byte((byte) 0); // use new to ensure a different object
 
     /**
      * Create a HeapPage from a set of bytes of data read from disk.

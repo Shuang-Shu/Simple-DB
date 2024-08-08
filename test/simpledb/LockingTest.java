@@ -3,7 +3,6 @@ package simpledb;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import junit.framework.JUnit4TestAdapter;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
@@ -63,14 +62,14 @@ public class LockingTest extends TestUtil.CreateHeapFile {
   /**
    * Generic unit test structure for BufferPool.getPage() assuming locking.
    *
-   * @param tid1 the first transaction Id
-   * @param pid1 the first page to lock over
-   * @param perm1 the type of lock for the first page
-   * @param tid2 the second transaction Id
-   * @param pid2 the second page to lock over
-   * @param perm2 the type of lock for the second page
+   * @param tid1     the first transaction Id
+   * @param pid1     the first page to lock over
+   * @param perm1    the type of lock for the first page
+   * @param tid2     the second transaction Id
+   * @param pid2     the second page to lock over
+   * @param perm2    the type of lock for the second page
    * @param expected true if we expect the second acquisition to succeed;
-   *   false otherwise
+   *                 false otherwise
    */
   public void metaLockTester(
       TransactionId tid1, PageId pid1, Permissions perm1,
@@ -87,89 +86,96 @@ public class LockingTest extends TestUtil.CreateHeapFile {
    * Generic unit test structure to grab an additional lock in a new
    * thread.
    *
-   * @param tid the transaction Id
-   * @param pid the first page to lock over
-   * @param perm the type of lock desired
+   * @param tid      the transaction Id
+   * @param pid      the first page to lock over
+   * @param perm     the type of lock desired
    * @param expected true if we expect the acquisition to succeed;
-   *   false otherwise
+   *                 false otherwise
    */
   public void grabLock(TransactionId tid, PageId pid, Permissions perm,
       boolean expected) throws Exception {
 
-      TestUtil.LockGrabber t = new TestUtil.LockGrabber(tid, pid, perm);
-      t.start();
+    TestUtil.LockGrabber t = new TestUtil.LockGrabber(tid, pid, perm);
+    t.start();
 
-      // if we don't have the lock after TIMEOUT, we assume blocking.
-      Thread.sleep(TIMEOUT);
-      assertEquals(expected, t.acquired());
+    // if we don't have the lock after TIMEOUT, we assume blocking.
+    Thread.sleep(TIMEOUT);
+    assertEquals(expected, t.acquired());
 
-      // TODO(ghuo): yes, stop() is evil, but this is unit test cleanup
-      t.stop();
+    // TODO(ghuo): yes, stop() is evil, but this is unit test cleanup
+    t.stop();
   }
 
   /**
    * Unit test for BufferPool.getPage() assuming locking.
    * Acquires two read locks on the same page.
    */
-  @Test public void acquireReadLocksOnSamePage() throws Exception {
+  @Test
+  public void acquireReadLocksOnSamePage() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_ONLY,
-                   tid2, p0, Permissions.READ_ONLY, true);
+        tid2, p0, Permissions.READ_ONLY, true);
   }
 
   /**
    * Unit test for BufferPool.getPage() assuming locking.
    * Acquires a read lock and a write lock on the same page, in that order.
    */
-  @Test public void acquireReadWriteLocksOnSamePage() throws Exception {
+  @Test
+  public void acquireReadWriteLocksOnSamePage() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_ONLY,
-                   tid2, p0, Permissions.READ_WRITE, false);
+        tid2, p0, Permissions.READ_WRITE, false);
   }
 
   /**
    * Unit test for BufferPool.getPage() assuming locking.
    * Acquires a write lock and a read lock on the same page, in that order.
    */
-  @Test public void acquireWriteReadLocksOnSamePage() throws Exception {
+  @Test
+  public void acquireWriteReadLocksOnSamePage() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_WRITE,
-                   tid2, p0, Permissions.READ_ONLY, false);
+        tid2, p0, Permissions.READ_ONLY, false);
   }
 
   /**
    * Unit test for BufferPool.getPage() assuming locking.
    * Acquires a read lock and a write lock on different pages.
    */
-  @Test public void acquireReadWriteLocksOnTwoPages() throws Exception {
+  @Test
+  public void acquireReadWriteLocksOnTwoPages() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_ONLY,
-                   tid2, p1, Permissions.READ_WRITE, true);
+        tid2, p1, Permissions.READ_WRITE, true);
   }
 
   /**
    * Unit test for BufferPool.getPage() assuming locking.
    * Acquires write locks on different pages.
    */
-  @Test public void acquireWriteLocksOnTwoPages() throws Exception {
+  @Test
+  public void acquireWriteLocksOnTwoPages() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_WRITE,
-                   tid2, p1, Permissions.READ_WRITE, true);
+        tid2, p1, Permissions.READ_WRITE, true);
   }
 
   /**
    * Unit test for BufferPool.getPage() assuming locking.
    * Acquires read locks on different pages.
    */
-  @Test public void acquireReadLocksOnTwoPages() throws Exception {
+  @Test
+  public void acquireReadLocksOnTwoPages() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_ONLY,
-                   tid2, p1, Permissions.READ_ONLY, true);
+        tid2, p1, Permissions.READ_ONLY, true);
   }
 
   /**
    * Unit test for BufferPool.getPage() assuming locking.
    * Attempt lock upgrade.
    */
-  @Test public void lockUpgrade() throws Exception {
+  @Test
+  public void lockUpgrade() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_ONLY,
-                   tid1, p0, Permissions.READ_WRITE, true);
+        tid1, p0, Permissions.READ_WRITE, true);
     metaLockTester(tid2, p1, Permissions.READ_ONLY,
-                   tid2, p1, Permissions.READ_WRITE, true);
+        tid2, p1, Permissions.READ_WRITE, true);
   }
 
   /**
@@ -177,9 +183,10 @@ public class LockingTest extends TestUtil.CreateHeapFile {
    * A single transaction should be able to acquire a read lock after it
    * already has a write lock.
    */
-  @Test public void acquireWriteAndReadLocks() throws Exception {
+  @Test
+  public void acquireWriteAndReadLocks() throws Exception {
     metaLockTester(tid1, p0, Permissions.READ_WRITE,
-                   tid1, p0, Permissions.READ_ONLY, true);
+        tid1, p0, Permissions.READ_ONLY, true);
   }
 
   /**
@@ -187,7 +194,8 @@ public class LockingTest extends TestUtil.CreateHeapFile {
    * assuming locking.
    * Acquires read locks on different pages.
    */
-  @Test public void acquireThenRelease() throws Exception {
+  @Test
+  public void acquireThenRelease() throws Exception {
     bp.getPage(tid1, p0, Permissions.READ_WRITE);
     bp.unsafeReleasePage(tid1, p0);
     bp.getPage(tid2, p0, Permissions.READ_WRITE);
@@ -205,4 +213,3 @@ public class LockingTest extends TestUtil.CreateHeapFile {
   }
 
 }
-

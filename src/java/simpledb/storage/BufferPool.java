@@ -3,40 +3,37 @@ package simpledb.storage;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
-import simpledb.common.DeadlockException;
-import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
-import java.beans.Transient;
 import java.io.*;
 import java.util.*;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 class Pair<T1, T2> {
     private T1 t1;
     private T2 t2;
 
-    public T1 getT1() {
+    public T1 first() {
         return t1;
     }
 
-    public void setT1(T1 t1) {
+    public void setFirst(T1 t1) {
         this.t1 = t1;
     }
 
-    public T2 getT2() {
+    public T2 second() {
         return t2;
     }
 
-    public void setT2(T2 t2) {
+    public void setSecond(T2 t2) {
         this.t2 = t2;
     }
 }
@@ -203,8 +200,9 @@ class AdjacencyListGraph<T, V> {
             if (vertexMap.get(element).contains(tempEdge)) {
                 vertexMap.get(element).remove(tempEdge);
             }
-            if (vertexMap.get(element).isEmpty())
+            if (vertexMap.get(element).isEmpty()) {
                 vertexMap.remove(element);
+            }
         }
     }
 
@@ -288,98 +286,90 @@ class EdgeNode<T, V> {
 
 // 锁管理器，管理Page层面上的锁
 class LockManager {
+    private Lock lock = new ReentrantLock();;
+
     // 存放了持有pageId对应Page的锁的transaction 集合以及锁类型
-    Map<PageId, Pair<Set<TransactionId>, Permissions>> locks;
-    // 存放了pageId对应的等待条件，当某个page锁可能被释放时该条件被激活
-    Map<PageId, Condition> conditionMap;
-    // 存放了transactionId所涉及的pageId，这和locks记录的关系是相反的，它是为了加快运行速度
-    Map<TransactionId, Set<PageId>> transactionPageMap;
-    // 用于对LockManager加锁
-    Lock managerLock;
-    // 用于进行死锁检测的等待图
-    AdjacencyListGraph<TransactionId, Integer> waitGraph;
+    private Map<PageId, Pair<Set<TransactionId>, Permissions>> pageTrxPermMap = new HashMap<>();
+    // store the condition of a locked page. when a page is unlocked, signal all
+    // waiting transactions
+    private Map<PageId, Condition> pageCondMap = new HashMap<>();
+    // inversed relation of locks, this is used to speed up page flushing
+    private Map<TransactionId, Set<PageId>> trxPageMap = new HashMap<>();
+    // for deadlock detection
+    private AdjacencyListGraph<TransactionId, Integer> waitingGraph = new AdjacencyListGraph<>();
 
-    // 构造函数
-    public LockManager() {
-        locks = new HashMap<>();
-        conditionMap = new HashMap<>();
-        transactionPageMap = new HashMap<>();
-        managerLock = new ReentrantLock();
-        waitGraph = new AdjacencyListGraph<>();
-    }
-
-    // 检验申请的permissons与pageId当前的锁是否相容
     public boolean isCompatible(Permissions permissions, PageId pageId) {
-        managerLock.lock();
+        lock.lock();
         try {
-            if (!locks.containsKey(pageId))
+            if (!pageTrxPermMap.containsKey(pageId))
                 return true;
             if (permissions == Permissions.READ_ONLY)
-                if (locks.get(pageId).getT2() == Permissions.READ_ONLY)
+                if (pageTrxPermMap.get(pageId).second() == Permissions.READ_ONLY)
                     return true;
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            managerLock.unlock();
+            lock.unlock();
         }
         return false;
     }
 
     // 尝试获取锁，若成功则返回；否则阻塞
-    public void requestLock(TransactionId transactionId, PageId pageId, Permissions permissions) {
-        managerLock.lock();
+    public void acquire(TransactionId transactionId, PageId pageId, Permissions permissions) {
+        lock.lock();
         try {
-            if (!locks.containsKey(pageId)) {
+            if (!pageTrxPermMap.containsKey(pageId)) {
                 // 该page的锁未被获取，设置其被获取，同时新增一个等待条件（起到了事务请求队列的作用）
                 Pair<Set<TransactionId>, Permissions> pair = new Pair<>();
                 Set<TransactionId> transactionSet = new HashSet<>();
                 transactionSet.add(transactionId);
-                pair.setT1(transactionSet);
-                pair.setT2(permissions);
-                locks.put(pageId, pair);
+                pair.setFirst(transactionSet);
+                pair.setSecond(permissions);
+                pageTrxPermMap.put(pageId, pair);
                 // 新增等待条件
-                conditionMap.put(pageId, managerLock.newCondition());
+                pageCondMap.put(pageId, lock.newCondition());
                 // 将transactionId对应的pageId插入transactionPageMap
-                if (!transactionPageMap.containsKey(transactionId)) {
+                if (!trxPageMap.containsKey(transactionId)) {
                     Set<PageId> pageIdSet = new HashSet<>();
                     pageIdSet.add(pageId);
-                    transactionPageMap.put(transactionId, pageIdSet);
+                    trxPageMap.put(transactionId, pageIdSet);
                 } else
-                    transactionPageMap.get(transactionId).add(pageId);
+                    trxPageMap.get(transactionId).add(pageId);
                 return;
-            } else if (!locks.get(pageId).getT1().contains(transactionId)) {
+            } else if (!pageTrxPermMap.get(pageId).first().contains(transactionId)) {
                 // 该page已上锁，且当前的transactionId不在已获得锁的集合中
                 // 不相容的情况，进入阻塞状态
                 while (!isCompatible(permissions, pageId)) {
                     try {
                         // 该方法会抛出java.lang.IllegalMonitorStateException异常，为何（await()方法需要被其对应的锁对象的lock()与unlock()方法包裹
                         // 在等待图中新建边
-                        Set<TransactionId> targetTidSet = locks.get(pageId).getT1();
-                        for (TransactionId tid : targetTidSet)
-                            waitGraph.insertEdge(transactionId, tid, null);
+                        Set<TransactionId> targetTidSet = pageTrxPermMap.get(pageId).first();
+                        for (TransactionId tid : targetTidSet) {
+                            waitingGraph.insertEdge(transactionId, tid, null);
+                        }
                         // 检查环的存在
-                        if (waitGraph.circleDetect(transactionId, transactionId, new HashSet<>()))
+                        if (waitingGraph.circleDetect(transactionId, transactionId, new HashSet<>())) {
                             throw new TransactionAbortedException();
-
-                        conditionMap.get(pageId).await();
+                        }
+                        pageCondMap.get(pageId).await();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
                 // 若相容，则将该事务放入拥有page锁的集合中
-                if (locks.containsKey(pageId)) {
+                if (pageTrxPermMap.containsKey(pageId)) {
                     // 此时集合不为空，直接放入即可，不需要处理事务
-                    locks.get(pageId).getT1().add(transactionId);
+                    pageTrxPermMap.get(pageId).first().add(transactionId);
                     // 将transactionId对应的pageId插入transactionPageMap
-                    if (!transactionPageMap.containsKey(transactionId)) {
+                    if (!trxPageMap.containsKey(transactionId)) {
                         Set<PageId> pageIdSet = new HashSet<>();
                         pageIdSet.add(pageId);
-                        transactionPageMap.put(transactionId, pageIdSet);
+                        trxPageMap.put(transactionId, pageIdSet);
                     } else
-                        transactionPageMap.get(transactionId).add(pageId);
+                        trxPageMap.get(transactionId).add(pageId);
                 } else {
                     // 此时拥有pageId对应的page的锁的事务集合为空，pageId已经从locks和conditionMap中删除，需要重新获取锁并设置等待条件
-                    requestLock(transactionId, pageId, permissions);
+                    acquire(transactionId, pageId, permissions);
                 }
             } else {
                 // 前的transactionId在已获得锁的集合中
@@ -388,32 +378,32 @@ class LockManager {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            managerLock.unlock();
+            lock.unlock();
         }
     }
 
     // 释放锁，释放事务在Page上的锁
-    public void releaseLock(TransactionId transactionId, PageId pageId) {
-        managerLock.lock();
+    public void release(TransactionId transactionId, PageId pageId) {
+        lock.lock();
         try {
-            if (!locks.containsKey(pageId))
+            if (!pageTrxPermMap.containsKey(pageId))
                 return;
-            locks.get(pageId).getT1().remove(transactionId);
-            Condition temp = conditionMap.get(pageId);
-            if (locks.get(pageId).getT1().isEmpty()) {
+            pageTrxPermMap.get(pageId).first().remove(transactionId);
+            Condition temp = pageCondMap.get(pageId);
+            if (pageTrxPermMap.get(pageId).first().isEmpty()) {
                 // 此时拥有pageId对应的page的锁的事务集合为空，将其从locks以及conditionMap中删除
-                locks.remove(pageId);
-                conditionMap.remove(pageId);
+                pageTrxPermMap.remove(pageId);
+                pageCondMap.remove(pageId);
             }
-            transactionPageMap.get(transactionId).remove(pageId);
-            if (transactionPageMap.get(transactionId).isEmpty())
-                transactionPageMap.remove(transactionId);
+            trxPageMap.get(transactionId).remove(pageId);
+            if (trxPageMap.get(transactionId).isEmpty())
+                trxPageMap.remove(transactionId);
             // 通知所有在该pageId上等待的事务进行尝试
             temp.signalAll();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            managerLock.unlock();
+            lock.unlock();
         }
     }
 
@@ -423,41 +413,58 @@ class LockManager {
      * 如果该page未被上锁，则将其升级为共享锁
      * 如果该page有共享锁，检查拥有pageId对应的page的锁的事务集合中是否有且仅有transactionId对应的事务，有则升级，否则返回false
      */
-    public boolean upgradeLock(TransactionId transactionId, PageId pageId) {
-        managerLock.lock();
+    public boolean upgrade(TransactionId transactionId, PageId pageId) {
+        lock.lock();
         try {
-            if (!locks.containsKey(pageId)) {
-                requestLock(transactionId, pageId, Permissions.READ_ONLY);
+            if (!pageTrxPermMap.containsKey(pageId)) {
+                acquire(transactionId, pageId, Permissions.READ_ONLY);
                 return true;
             }
-            if (locks.get(pageId).getT2() == Permissions.READ_WRITE)
+            if (pageTrxPermMap.get(pageId).second() == Permissions.READ_WRITE)
                 return false;
-            if (locks.get(pageId).getT1().size() == 1 && locks.get(pageId).getT1().contains(transactionId)) {
-                locks.get(pageId).setT2(Permissions.READ_WRITE);
+            if (pageTrxPermMap.get(pageId).first().size() == 1
+                    && pageTrxPermMap.get(pageId).first().contains(transactionId)) {
+                pageTrxPermMap.get(pageId).setSecond(Permissions.READ_WRITE);
                 return true;
             } else
                 return false;
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            managerLock.unlock();
+            lock.unlock();
         }
         return false;
     }
 
     // 查看事务transactionId是否持有pageId上的锁
-    public Permissions peekPermisson(TransactionId transactionId, PageId pageId) {
-        managerLock.lock();
+    public Permissions peekPermisson(TransactionId tid, PageId pid) {
+        lock.lock();
         try {
-            if (locks.containsKey(pageId))
-                if (locks.get(pageId).getT1().contains(transactionId))
-                    return locks.get(pageId).getT2();
-        } catch (Exception e) {
-            e.printStackTrace();
+            if (pageTrxPermMap.containsKey(pid) && pageTrxPermMap.get(pid).first().contains(tid)) {
+                return pageTrxPermMap.get(pid).second();
+            }
         } finally {
-            managerLock.unlock();
+            lock.unlock();
         }
         return null;
+    }
+
+    /**
+     * remove all locks hold by tid
+     * 
+     * @param tid transaction id
+     */
+    public void removeLock(TransactionId tid) {
+        lock.lock();
+        try {
+            // 在等待图中移除所有与事务相关的边
+            waitingGraph.removeVertex(tid);
+            // 释放所有与该tid相关的锁
+            Set<PageId> relatedPageSet = trxPageMap.getOrDefault(tid, new HashSet<>());
+            relatedPageSet.stream().collect(Collectors.toList()).forEach(pg -> release(tid, pg));
+        } finally {
+            lock.unlock();
+        }
     }
 }
 
@@ -536,7 +543,7 @@ public class BufferPool {
         // 要考虑读取的权限问题
         // 在bufferPool中查找对应的pid
         // 请求加锁
-        lockManager.requestLock(tid, pid, perm);
+        lockManager.acquire(tid, pid, perm);
         Iterator<Page> iterator = this.bufferPool.iterator();
         // 1 find target page in bufferpool
         while (iterator.hasNext()) {
@@ -594,7 +601,7 @@ public class BufferPool {
     public void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
-        lockManager.releaseLock(tid, pid);
+        lockManager.release(tid, pid);
     }
 
     /**
@@ -605,20 +612,14 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
-        try {
-            transactionComplete(tid, true);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
-        if (lockManager.peekPermisson(tid, pid) != null)
-            return true;
-        return false;
+        return lockManager.peekPermisson(tid, pid) != null;
     }
 
     /**
@@ -631,28 +632,25 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
-        if (commit) {
-            // 成功commit的情况
-            // 持久化BufferPool中所有与tid相关的page
-            // this is a synchronous operation, may decrease performance
-            // TODO: modify flush page to be asynchronous
-            for (int i = 0; i < bufferPool.size(); ++i) {
-                TransactionId temp = bufferPool.get(i).isDirty();
-                if (temp == tid) {
-                    // 该page应该被持久化
-                    try {
-                        Page flushPage = bufferPool.get(i);
-                        // ---------- Lab6添加的内容
-                        flushPage.setBeforeImage();
-                        // ----------
-                        flushPage(flushPage.getId());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+        try {
+            if (commit) {
+                // 成功commit的情况
+                // 持久化BufferPool中所有与tid相关的page
+                // this is a synchronous operation, may decrease performance
+                // TODO: modify flush page can be asynchronous
+                for (int i = 0; i < bufferPool.size(); ++i) {
+                    bufferPool.stream().filter(p -> p.isDirty() == tid).forEach(p -> {
+                        try {
+                            p.setBeforeImage(); // added in Lab6
+                            flushPage(p.getId());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
                 }
+                return;
             }
-        } else {
-            // 事务异常终止的情况
+            // transaction aborting
             for (int i = 0; i < bufferPool.size(); ++i) {
                 TransactionId temp = bufferPool.get(i).isDirty();
                 if (temp == tid) {
@@ -662,16 +660,9 @@ public class BufferPool {
                     bufferPool.set(i, Database.getCatalog().getDatabaseFile(tableId).readPage(pid));
                 }
             }
+        } finally {
+            lockManager.removeLock(tid);
         }
-        // 在等待图中移除所有与事务相关的边
-        lockManager.waitGraph.removeVertex(tid);
-        // 释放所有与该tid相关的锁
-        Set<PageId> set = lockManager.transactionPageMap.get(tid);
-        Set<PageId> clonedSet = new HashSet<>();
-        for (PageId pageId : set)
-            clonedSet.add(pageId);
-        for (PageId pageId : clonedSet)
-            lockManager.releaseLock(tid, pageId);
     }
 
     /**
@@ -758,8 +749,13 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
         for (int i = 0; i < this.bufferPool.size(); ++i) {
-            if (this.bufferPool.get(i) != null && this.bufferPool.get(i).isDirty() != null)
-                this.flushPage(this.bufferPool.get(i).getId());
+            bufferPool.stream().filter(p -> p != null && p.isDirty() != null).forEach(p -> {
+                try {
+                    flushPage(p.getId());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
         }
     }
 
@@ -803,14 +799,14 @@ public class BufferPool {
         while (iterator.hasNext()) {
             Page page = iterator.next();
             if (page.getId().equals(pid)) {
-                // ---------- Lab6 添加的内容
-                TransactionId opTid = page.isDirty();
-                if (opTid != null) {
+                // added by lab6
+                // implements FORCE mode
+                TransactionId tid = page.isDirty();
+                if (tid != null) {
                     // write ahead log
-                    Database.getLogFile().logWrite(opTid, page.getBeforeImage(), page);
+                    Database.getLogFile().logWrite(tid, page.getBeforeImage(), page);
                     Database.getLogFile().force();
                 }
-                // ----------
                 Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(page);
                 return;
             }
@@ -838,8 +834,11 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
         // 仅仅简单的替换掉第一个page
-        // Lab4中需要修改该方法，保证不置换一个DirtyPage
         // 通过简单的遍历实现
+        // NO-STEAL requires that a dirty page should not be evicted
+        // * Q: concurrent problem?
+        // * A: no, this method is called under the protection of lockManager, ONLY ONE
+        // * writing transaction can be executed at the same time
         int index = -1;
         for (int i = 0; i < bufferPool.size(); ++i) {
             if (bufferPool.get(i).isDirty() == null) {
@@ -851,17 +850,16 @@ public class BufferPool {
             try {
                 this.flushPage(this.bufferPool.get(index).getId());
             } catch (IOException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
             this.discardPage(this.bufferPool.get(index).getId());
         } else {
-            throw new DbException("BufferPool中全为脏页，无法置换");
+            throw new DbException("no page in bufferpool can be evicted");
         }
     }
 
     // 自己添加的函数，用于rollback
-    public void setPage(TransactionId tid, PageId pid, Permissions perm, Page oldPage, Page newPage) {
+    public void setPage(TransactionId tid, PageId pid, Permissions perm, Page consistentPage) {
         int index = -1;
         int count = 0;
         for (Page page : bufferPool) {
@@ -888,7 +886,7 @@ public class BufferPool {
             }
         }
         // lockManager.requestLock(tid, bufferPool.get(index).getId(), perm);
-        bufferPool.set(index, newPage);
+        bufferPool.set(index, consistentPage);
     }
 
     private ArrayList<Page> bufferPool = null;

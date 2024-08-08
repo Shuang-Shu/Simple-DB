@@ -8,8 +8,11 @@ import simpledb.common.Permissions;
 
 import java.io.*;
 import java.util.*;
-
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import java.lang.reflect.*;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 /*
 LogFile implements the recovery subsystem of SimpleDb.  This class is
@@ -108,12 +111,16 @@ public class LogFile {
 
     final static int INT_SIZE = 4;
     final static int LONG_SIZE = 8;
+    final static byte[] HEADER_BUF = new byte[INT_SIZE + LONG_SIZE];
+    final static AtomicBoolean rollbackOnce = new AtomicBoolean();
 
     long currentOffset = -1;// protected by this
     // int pageSize;
-    int totalRecords = 0; // for PatchTest //protected by this
+    int totalEntitiesNumber = 0; // for PatchTest //protected by this
 
-    final Map<Long, Long> tidToFirstLogRecord = new HashMap<>();
+    // an in-memory data structure to keep track of the offset of each uncommitted
+    // transaction
+    final Map<TransactionId, Long> aliveTidOffsetMap = new HashMap<>();
 
     /**
      * Constructor.
@@ -151,7 +158,7 @@ public class LogFile {
     // 我们将附加一个日志记录。
     // 如果我们不确定DB是否想要恢复,我们现在确定--它不想恢复。所以对日志进行截断
     void preAppend() throws IOException {
-        totalRecords++;
+        totalEntitiesNumber++;
         if (recoveryUndecided) {
             recoveryUndecided = false;
             raf.seek(0);
@@ -163,8 +170,8 @@ public class LogFile {
         }
     }
 
-    public synchronized int getTotalRecords() {
-        return totalRecords;
+    public synchronized int getTotalEntitiesNumber() {
+        return totalEntitiesNumber;
     }
 
     /**
@@ -185,7 +192,7 @@ public class LogFile {
                 preAppend();
                 // Debug.log("ABORT");
                 // should we verify that this is a live transaction?
-                // 我们是否应该验证这是一个实时事务?
+                // 我们是否应该验证这是一个活动事务?
 
                 // must do this here, since rollback only works for
                 // live transactions (needs tidToFirstLogRecord)
@@ -197,7 +204,7 @@ public class LogFile {
                 raf.writeLong(currentOffset);
                 currentOffset = raf.getFilePointer();
                 force();
-                tidToFirstLogRecord.remove(tid.getId());
+                aliveTidOffsetMap.remove(tid);
             }
         }
     }
@@ -220,7 +227,7 @@ public class LogFile {
         raf.writeLong(currentOffset);
         currentOffset = raf.getFilePointer();
         force();
-        tidToFirstLogRecord.remove(tid.getId());
+        aliveTidOffsetMap.remove(tid);
     }
 
     /**
@@ -357,7 +364,7 @@ public class LogFile {
     public synchronized void logXactionBegin(TransactionId tid)
             throws IOException {
         Debug.log("BEGIN");
-        if (tidToFirstLogRecord.get(tid.getId()) != null) {
+        if (aliveTidOffsetMap.containsKey(tid)) {
             System.err.print("logXactionBegin: already began this tid\n");
             throw new IOException("double logXactionBegin()");
         }
@@ -365,7 +372,7 @@ public class LogFile {
         raf.writeInt(BEGIN_RECORD); // 事务开始
         raf.writeLong(tid.getId()); // 事务id
         raf.writeLong(currentOffset); // 偏移量
-        tidToFirstLogRecord.put(tid.getId(), currentOffset);
+        aliveTidOffsetMap.put(tid, currentOffset);
         currentOffset = raf.getFilePointer();
 
         Debug.log("BEGIN OFFSET = " + currentOffset);
@@ -379,39 +386,35 @@ public class LogFile {
             synchronized (this) {
                 // Debug.log("CHECKPOINT, offset = " + raf.getFilePointer());
                 preAppend();
-                long startCpOffset, endCpOffset;
-                Set<Long> keys = tidToFirstLogRecord.keySet();
-                Iterator<Long> els = keys.iterator();
-                force();
+                long startCheckpointOffset;
+                Set<Long> rawTidSet = Set
+                        .copyOf(aliveTidOffsetMap.keySet().stream().map(tid -> tid.getId())
+                                .collect(Collectors.toList()));
+                Iterator<Long> rawTidIter = rawTidSet.iterator(); // iterate on all alive transactions
+                force(); // persist all data
                 Database.getBufferPool().flushAllPages();
-                startCpOffset = raf.getFilePointer();
+                startCheckpointOffset = raf.getFilePointer();
                 raf.writeInt(CHECKPOINT_RECORD);
                 raf.writeLong(-1); // no tid , but leave space for convenience
 
                 // write list of outstanding transactions
                 // 写入未完成事务的清单
-                raf.writeInt(keys.size());
-                while (els.hasNext()) {
-                    Long key = els.next();
-                    Debug.log("WRITING CHECKPOINT TRANSACTION ID: " + key);
-                    raf.writeLong(key);
+                raf.writeInt(rawTidSet.size());
+                while (rawTidIter.hasNext()) {
+                    Long rawTid = rawTidIter.next();
+                    Debug.log("WRITING CHECKPOINT TRANSACTION ID: " + rawTid);
+                    raf.writeLong(rawTid);
                     // Debug.log("WRITING CHECKPOINT TRANSACTION OFFSET: " +
-                    // tidToFirstLogRecord.get(key));
-                    raf.writeLong(tidToFirstLogRecord.get(key));
+                    raf.writeLong(aliveTidOffsetMap.get(new TransactionId(rawTid)));
                 }
 
                 // once the CP is written, make sure the CP location at the
                 // beginning of the log file is updated
-                endCpOffset = raf.getFilePointer();
+                raf.writeLong(startCheckpointOffset);
                 raf.seek(0);
-                raf.writeLong(startCpOffset);
-                raf.seek(endCpOffset);
-                raf.writeLong(currentOffset);
-                currentOffset = raf.getFilePointer();
-                // Debug.log("CP OFFSET = " + currentOffset);
+                raf.writeLong(startCheckpointOffset); // update the log header
             }
         }
-
         logTruncate();
     }
 
@@ -423,7 +426,7 @@ public class LogFile {
     public synchronized void logTruncate() throws IOException {
         preAppend();
         raf.seek(0);
-        long cpLoc = raf.readLong();
+        long cpLoc = raf.readLong(); // checkpoint offset
 
         long minLogRecord = cpLoc;
 
@@ -437,7 +440,7 @@ public class LogFile {
                 throw new RuntimeException("Checkpoint pointer does not point to checkpoint record");
             }
 
-            int numOutstanding = raf.readInt();
+            int numOutstanding = raf.readInt(); // number of uncommited transaction
 
             for (int i = 0; i < numOutstanding; i++) {
                 @SuppressWarnings("unused")
@@ -461,13 +464,13 @@ public class LogFile {
         while (true) {
             try {
                 int type = raf.readInt();
-                long record_tid = raf.readLong();
+                long recordTid = raf.readLong();
                 long newStart = logNew.getFilePointer();
 
                 Debug.log("NEW START = " + newStart);
 
                 logNew.writeInt(type);
-                logNew.writeLong(record_tid);
+                logNew.writeLong(recordTid);
 
                 switch (type) {
                     case UPDATE_RECORD:
@@ -488,15 +491,14 @@ public class LogFile {
                         }
                         break;
                     case BEGIN_RECORD:
-                        tidToFirstLogRecord.put(record_tid, newStart);
+                        aliveTidOffsetMap.put(new TransactionId(recordTid), newStart);
                         break;
                 }
-
                 // all xactions finish with a pointer
                 logNew.writeLong(newStart);
                 raf.readLong();
-
             } catch (EOFException e) {
+                System.out.println("err: " + e.getMessage());
                 break;
             }
         }
@@ -505,8 +507,12 @@ public class LogFile {
                 + (raf.length() - minLogRecord));
 
         raf.close();
-        logFile.delete();
-        newFile.renameTo(logFile);
+        try {
+            Files.move(newFile.toPath(), logFile.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         raf = new RandomAccessFile(logFile, "rw");
         raf.seek(raf.length());
         newFile.delete();
@@ -526,6 +532,8 @@ public class LogFile {
      * 为了保持事务语义，不应该对已经提交的事务调用该函数
      * (尽管该方法可能不会强制执行该函数)。
      * 
+     * rollback is also a transaction
+     * 
      * @param tid The transaction to rollback
      */
     public void rollback(TransactionId tid)
@@ -537,52 +545,47 @@ public class LogFile {
                 // 找到所有与中止事务相关的更新记录
                 raf.seek(0);
                 Long checkPoint = raf.readLong();
-                Set<Long> uncommittedTids = new HashSet<>();
+                Set<Long> uncommittedRawTidSet = new HashSet<>();
                 Long offset = Long.valueOf(-1);
                 if (checkPoint == -1) {
-                    // 如果没有检查点，则使用第一个记录的位置
-                    offset = tidToFirstLogRecord.get(tid.getId());
-                    uncommittedTids.add(tid.getId());
+                    // no checkpoint is found, only rollback current transaction
+                    offset = aliveTidOffsetMap.get(tid);
+                    uncommittedRawTidSet.add(tid.getId());
                 } else {
-                    // 否则，检索checkpoint，获取相应tid的offset，同时记录所有未完成的
-                    raf.seek(checkPoint);
-                    raf.readInt();
-                    raf.readLong();
-                    int numTransactions = raf.readInt();
-                    while (numTransactions-- > 0) {
-                        Long uncommittedTid = raf.readLong();// tid
-                        uncommittedTids.add(uncommittedTid);
-                        Long recordOffset = raf.readLong();
-                        if (uncommittedTid == tid.getId()) {// FIRST LOG RECORD
-                            offset = recordOffset;
+                    if (rollbackOnce.compareAndSet(false, true)) {
+                        // get all uncommitted transactions
+                        raf.seek(checkPoint);
+                        raf.read(HEADER_BUF); // skip trx number & tid
+                        int numTransactions = raf.readInt();
+                        while (numTransactions-- > 0) {
+                            Long uncommittedRawTid = raf.readLong();
+                            uncommittedRawTidSet.add(uncommittedRawTid);
+                            Long recordOffset = raf.readLong();
+                            if (uncommittedRawTid == tid.getId()) {// FIRST LOG RECORD
+                                offset = recordOffset;
+                            }
                         }
+                        raf.readLong();
+                    } else {
+                        // rollback of checkpoint should be done only once
+                        offset = raf.getFilePointer();
                     }
-                    raf.readLong();
                 }
                 raf.seek(offset);
                 while (true) {
                     try {
-                        int cpType = raf.readInt();
-                        long cpTid = raf.readLong();
+                        int entityType = raf.readInt();
+                        long entityTid = raf.readLong();
 
-                        if (!uncommittedTids.contains(cpTid))
+                        if (!uncommittedRawTidSet.contains(entityTid)) {
                             break;
+                        }
 
-                        switch (cpType) {
-                            case BEGIN_RECORD:
-                                // 简单地略过
+                        switch (entityType) {
+                            case BEGIN_RECORD, ABORT_RECORD, COMMIT_RECORD: // no data, just skip
                                 raf.readLong();
                                 break;
-                            case ABORT_RECORD:
-                                // 简单地略过
-                                raf.readLong();
-                                break;
-                            case COMMIT_RECORD:
-                                // 简单地略过
-                                raf.readLong();
-                                break;
-                            case CHECKPOINT_RECORD:
-                                // 暂不处理
+                            case CHECKPOINT_RECORD: // no data, just skip
                                 int numTransactions = raf.readInt();
                                 while (numTransactions-- > 0) {
                                     raf.readLong();// tid
@@ -591,18 +594,15 @@ public class LogFile {
                                 raf.readLong();
                                 break;
                             case UPDATE_RECORD:
-                                // 此时针对更新记录恢复磁盘文件
+                                // rollback the uncommitted transaction
                                 Page before = readPageData(raf);
-                                Page after = readPageData(raf);
-                                // 将磁盘中的新页面恢复为旧镜像
-                                Database.getBufferPool().setPage(tid, before.getId(), Permissions.READ_WRITE, after,
-                                        before);
+                                readPageData(raf);
+                                // physically reset the page to the before image
+                                Database.getBufferPool().setPage(tid, before.getId(), Permissions.READ_WRITE, before);
                                 Database.getBufferPool().flushPages(tid);
                                 break;
                         }
-
                     } catch (EOFException e) {
-                        // e.printStackTrace();
                         break;
                     }
                 }
@@ -696,10 +696,7 @@ public class LogFile {
                         int recordType = raf.readInt();
                         long recordTid = raf.readLong();
                         switch (recordType) {
-                            case ABORT_RECORD:
-                                raf.readLong();
-                                break;
-                            case COMMIT_RECORD:
+                            case BEGIN_RECORD, COMMIT_RECORD, ABORT_RECORD: // not data, just skip
                                 raf.readLong();
                                 break;
                             case UPDATE_RECORD:
@@ -711,22 +708,17 @@ public class LogFile {
 
                                 if (uncommittedTransactions.contains(recordTid)) {
                                     // 此时进行undo
-                                    Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, null,
-                                            before);
+                                    Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, before);
                                 } else {
                                     // 此时进行redo
-                                    if (recordType == COMMIT_RECORD)
-                                        Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, null,
-                                                after);
-                                    else
-                                        Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, null,
+                                    if (recordType == COMMIT_RECORD) {
+                                        Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE, after);
+                                    } else {
+                                        Database.getBufferPool().setPage(recoverId, pid, Permissions.READ_WRITE,
                                                 before);
+                                    }
                                 }
                                 Database.getBufferPool().flushPages(recoverId);
-                                raf.readLong();
-                                break;
-                            case BEGIN_RECORD:
-                                // 跳过
                                 raf.readLong();
                                 break;
                         }

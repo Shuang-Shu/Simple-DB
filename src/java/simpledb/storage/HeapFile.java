@@ -40,7 +40,7 @@ public class HeapFile implements DbFile {
                 // 事务的ID
                 this.transactionId = tid;
                 HeapPageId pid = new HeapPageId(getId(), this.pageIndex);
-                this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_WRITE);
+                this.page = (HeapPage) Database.getBufferPool().getPage(transactionId, pid, Permissions.READ_ONLY);
                 Database.getBufferPool();
                 this.totalPageNumber = (int) (heapFile.length() / BufferPool.getPageSize());
                 this.iterator = this.page.iterator();

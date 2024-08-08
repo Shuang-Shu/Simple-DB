@@ -22,7 +22,8 @@ public class TransactionTest extends TestUtil.CreateHeapFile {
   /**
    * Set up initial resources for each unit test.
    */
-  @Before public void setUp() throws Exception {
+  @Before
+  public void setUp() throws Exception {
     super.setUp();
 
     // clear all state from the buffer pool
@@ -58,7 +59,8 @@ public class TransactionTest extends TestUtil.CreateHeapFile {
    * Try to acquire locks that would conflict if old locks aren't released
    * during transactionComplete().
    */
-  @Test public void attemptTransactionTwice() throws Exception {
+  @Test
+  public void attemptTransactionTwice() throws Exception {
     bp.getPage(tid1, p0, Permissions.READ_ONLY);
     bp.getPage(tid1, p1, Permissions.READ_WRITE);
     bp.transactionComplete(tid1, true);
@@ -108,7 +110,8 @@ public class TransactionTest extends TestUtil.CreateHeapFile {
    * Unit test for BufferPool.transactionComplete() assuing commit.
    * Verify that a tuple inserted during a committed transaction is durable
    */
-  @Test public void commitTransaction() throws Exception {
+  @Test
+  public void commitTransaction() throws Exception {
     testTransactionComplete(true);
   }
 
@@ -116,7 +119,8 @@ public class TransactionTest extends TestUtil.CreateHeapFile {
    * Unit test for BufferPool.transactionComplete() assuming abort.
    * Verify that a tuple inserted during a committed transaction is durable
    */
-  @Test public void abortTransaction() throws Exception {
+  @Test
+  public void abortTransaction() throws Exception {
     testTransactionComplete(false);
   }
 
@@ -128,4 +132,3 @@ public class TransactionTest extends TestUtil.CreateHeapFile {
   }
 
 }
-
